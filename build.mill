@@ -1,0 +1,106 @@
+//| mvnDeps:
+//| - com.goyeau::mill-scalafix::0.6.0
+
+import mill._
+import mill.scalalib._
+import mill.scalalib.Assembly
+import mill.scalalib.publish._
+import com.goyeau.mill.scalafix.ScalafixModule
+
+trait CommonScalaModule extends ScalaModule with ScalafixModule {
+  def scalaVersion = "3.8.1"
+  def javacOptions = Seq("--release", "17")
+  def scalacOptions = Seq("-deprecation", "-feature", "-Wunused:all")
+}
+
+// Minimal PomSettings for test fixtures
+def fixturePom(desc: String) = PomSettings(
+  description = desc,
+  organization = "cellar.test",
+  url = "https://github.com/example/cellar",
+  licenses = Seq(License.`Apache-2.0`),
+  versionControl = VersionControl.github("example", "cellar"),
+  developers = Seq.empty
+)
+
+object lib extends CommonScalaModule {
+  def mvnDeps = Seq(
+    mvn"org.typelevel::cats-effect:3.5.7",
+    mvn"co.fs2::fs2-core:3.11.0",
+    mvn"io.get-coursier:interface:1.0.28",
+    mvn"ch.epfl.scala::tasty-query:1.7.0"
+  )
+
+  object test extends ScalaTests with TestModule.Munit {
+    def mvnDeps = super.mvnDeps() ++ Seq(
+      mvn"org.scalameta::munit:1.0.4",
+      mvn"org.typelevel::munit-cats-effect:2.0.0"
+    )
+    def forkArgs = Seq(
+      s"-Dcellar.test.localM2=${os.home / ".m2" / "repository"}",
+      s"-Dcellar.test.fixtureJavaGroup=cellar.test",
+      s"-Dcellar.test.fixtureJavaArtifact=cellar-fixture-java",
+      s"-Dcellar.test.fixtureJavaVersion=0.1.0-SNAPSHOT",
+      s"-Dcellar.test.fixtureScala2Group=cellar.test",
+      s"-Dcellar.test.fixtureScala2Artifact=cellar-fixture-scala2_2.13",
+      s"-Dcellar.test.fixtureScala2Version=0.1.0-SNAPSHOT",
+      s"-Dcellar.test.fixtureScala3Group=cellar.test",
+      s"-Dcellar.test.fixtureScala3Artifact=cellar-fixture-scala3_3",
+      s"-Dcellar.test.fixtureScala3Version=0.1.0-SNAPSHOT"
+    )
+  }
+}
+
+object cli extends CommonScalaModule {
+  def moduleDeps = Seq(lib)
+  def mainClass = Some("cellar.cli.CellarApp")
+  def mvnDeps = Seq(
+    mvn"com.monovore::decline:2.4.1",
+    mvn"com.monovore::decline-effect:2.4.1"
+  )
+  def assemblyRules = Seq(
+    Assembly.Rule.Append("META-INF/services/.*"),
+    Assembly.Rule.Append("reference.conf"),
+    Assembly.Rule.ExcludePattern("META-INF/.*\\.SF"),
+    Assembly.Rule.ExcludePattern("META-INF/.*\\.DSA"),
+    Assembly.Rule.ExcludePattern("META-INF/.*\\.RSA"),
+    Assembly.Rule.ExcludePattern("module-info.class")
+  ) ++ Assembly.defaultRules
+
+  object test extends ScalaTests with TestModule.Munit {
+    def mvnDeps = super.mvnDeps() ++ Seq(
+      mvn"org.scalameta::munit:1.0.4",
+      mvn"org.typelevel::munit-cats-effect:2.0.0"
+    )
+  }
+}
+
+/** Publish all three fixture artifacts to ~/.m2 before running integration tests.
+  * Usage: ./mill publishFixtures && ./mill lib.test
+  */
+def publishFixtures() = Task.Command {
+  fixtureJava.publishM2Local()()
+  fixtureScala2.publishM2Local()()
+  fixtureScala3.publishM2Local()()
+}
+
+object fixtureJava extends JavaModule with PublishModule {
+  def javacOptions = Seq("--release", "17")
+  def publishVersion = "0.1.0-SNAPSHOT"
+  def artifactName   = "cellar-fixture-java"
+  def pomSettings    = fixturePom("Cellar Java test fixture")
+}
+
+object fixtureScala2 extends ScalaModule with PublishModule {
+  def scalaVersion   = "2.13.16"
+  def javacOptions   = Seq("--release", "17")
+  def publishVersion = "0.1.0-SNAPSHOT"
+  def artifactName   = "cellar-fixture-scala2"
+  def pomSettings    = fixturePom("Cellar Scala 2.13 test fixture")
+}
+
+object fixtureScala3 extends CommonScalaModule with PublishModule {
+  def publishVersion = "0.1.0-SNAPSHOT"
+  def artifactName   = "cellar-fixture-scala3"
+  def pomSettings    = fixturePom("Cellar Scala 3 test fixture")
+}
