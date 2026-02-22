@@ -1,0 +1,41 @@
+package cellar.fixture.java;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A concrete generic Java class implementing CellarJavaInterface.
+ */
+public class CellarJavaClass<T extends Comparable<T>> implements CellarJavaInterface<T> {
+    private final T defaultValue;
+
+    public CellarJavaClass(T defaultValue) {
+        this.defaultValue = defaultValue;
+    }
+
+    public static <E extends Comparable<E>> CellarJavaClass<E> of(E value) {
+        return new CellarJavaClass<>(value);
+    }
+
+    @Override
+    public T identity(T value) {
+        return value;
+    }
+
+    @Override
+    public List<T> repeat(T value, int times) {
+        List<T> result = new ArrayList<>(times);
+        for (int i = 0; i < times; i++) {
+            result.add(value);
+        }
+        return result;
+    }
+
+    public T getDefault() {
+        return defaultValue;
+    }
+
+    public static int staticHelper(int n) {
+        return n * 2;
+    }
+}
