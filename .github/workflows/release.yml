@@ -43,6 +43,8 @@ jobs:
 
       - name: Build native image
         run: ./mill cli.nativeImage
+        env:
+          CELLAR_VERSION: ${{ github.ref_name }}
 
       - name: Package artifact
         shell: bash

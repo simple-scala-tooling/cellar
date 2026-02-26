@@ -64,6 +64,23 @@ object cli extends CommonScalaModule with NativeImageModule {
   def moduleDeps = Seq(lib)
   def mainClass = Some("cellar.cli.CellarApp")
 
+  def cellarVersion: T[String] = Task.Input {
+    sys.env.getOrElse("CELLAR_VERSION", "0.1.0-SNAPSHOT").stripPrefix("v")
+  }
+
+  def generatedSources = Task {
+    val dir = Task.dest
+    val safeVersion = cellarVersion().replace("\\", "\\\\").replace("\"", "\\\"")
+    os.write(
+      dir / "BuildInfo.scala",
+      s"""package cellar.cli
+         |private[cli] object BuildInfo:
+         |  val version = "${safeVersion}"
+         |""".stripMargin
+    )
+    super.generatedSources() ++ Seq(PathRef(dir))
+  }
+
   def jvmVersion = "graalvm-community:23.0.2"
 
   def nativeImageOptions = Seq(
