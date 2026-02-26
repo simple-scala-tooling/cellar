@@ -17,18 +17,18 @@ object CoordinateCompleter:
         // Artifact exists — must be a version problem
         val versions = Versions.create().withModule(Module.of(coord.group, coord.artifact, java.util.Collections.emptyMap()))
         if extraRepos.nonEmpty then versions.addRepositories(extraRepos*)
-        val latest = versions.versions().getMergedListings.getLatest
-        if latest != null && latest.nonEmpty then
-          List(s"Artifact exists. Latest version: $latest")
+        val release = versions.versions().getMergedListings.getRelease
+        if release != null && release.nonEmpty then
+          List(s"Artifact exists. Latest version: $release")
         else Nil
       else if completions.nonEmpty then
         completions.take(5).flatMap { artifactName =>
           val module = Module.of(coord.group, artifactName, java.util.Collections.emptyMap())
           val versions = Versions.create().withModule(module)
           if extraRepos.nonEmpty then versions.addRepositories(extraRepos*)
-          val latest = versions.versions().getMergedListings.getLatest
-          if latest != null && latest.nonEmpty then
-            Some(s"${coord.group}:$artifactName:$latest")
+          val release = versions.versions().getMergedListings.getRelease
+          if release != null && release.nonEmpty then
+            Some(s"${coord.group}:$artifactName:$release")
           else
             Some(s"${coord.group}:$artifactName")
         }

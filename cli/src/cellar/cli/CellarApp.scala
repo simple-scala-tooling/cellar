@@ -38,30 +38,38 @@ object CellarApp
       .option[Int]("limit", "Maximum number of results to return", short = "l", metavar = "N")
       .withDefault(50)
 
+  private def parseAndResolve(raw: String, extraRepos: List[Repository]): IO[Either[String, MavenCoordinate]] =
+    MavenCoordinate.parse(raw) match
+      case Left(err)    => IO.pure(Left(err))
+      case Right(coord) => coord.resolveLatest(extraRepos).map(Right(_))
+
   private val getSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get", "Fetch all information about a named symbol") {
       (coordArg, symbolArg, javaHomeOpt, extraReposOpt).mapN { (rawCoord, fqn, javaHome, extraRepos) =>
-        MavenCoordinate.parse(rawCoord) match
+        parseAndResolve(rawCoord, extraRepos).flatMap {
           case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
           case Right(coord) => GetHandler.run(coord, fqn, javaHome, extraRepos)
+        }
       }
     }
 
   private val getSourceSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get-source", "Fetch the source code of a named symbol") {
       (coordArg, symbolArg, javaHomeOpt, extraReposOpt).mapN { (rawCoord, fqn, javaHome, extraRepos) =>
-        MavenCoordinate.parse(rawCoord) match
+        parseAndResolve(rawCoord, extraRepos).flatMap {
           case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
           case Right(coord) => GetSourceHandler.run(coord, fqn, javaHome, extraRepos)
+        }
       }
     }
 
   private val listSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("list", "List symbols in a package or class") {
       (coordArg, symbolArg, limitOpt, javaHomeOpt, extraReposOpt).mapN { (rawCoord, fqn, limit, javaHome, extraRepos) =>
-        MavenCoordinate.parse(rawCoord) match
+        parseAndResolve(rawCoord, extraRepos).flatMap {
           case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
           case Right(coord) => ListHandler.run(coord, fqn, limit, javaHome, extraRepos)
+        }
       }
     }
 
@@ -69,17 +77,19 @@ object CellarApp
     Opts.subcommand("search", "Substring search for symbol names") {
       (coordArg, Opts.argument[String]("query"), limitOpt, javaHomeOpt, extraReposOpt).mapN {
         (rawCoord, query, limit, javaHome, extraRepos) =>
-          MavenCoordinate.parse(rawCoord) match
+          parseAndResolve(rawCoord, extraRepos).flatMap {
             case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
             case Right(coord) => SearchHandler.run(coord, query, limit, javaHome, extraRepos)
+          }
       }
     }
 
   private val depsSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("deps", "Print the transitive dependency list") {
       (coordArg, extraReposOpt).mapN { (rawCoord, extraRepos) =>
-        MavenCoordinate.parse(rawCoord) match
+        parseAndResolve(rawCoord, extraRepos).flatMap {
           case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
           case Right(coord) => DepsHandler.run(coord, extraRepositories = extraRepos)
+        }
       }
     }

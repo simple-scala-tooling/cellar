@@ -2,10 +2,25 @@ package cellar
 
 import java.nio.file.{Files, Path, StandardCopyOption}
 import java.util.zip.ZipFile
+import scala.jdk.CollectionConverters.*
 import scala.quoted.*
 import scala.tasty.inspector.*
+import coursierapi.{Cache, Fetch}
 
 object DocstringExtractor:
+  private def isStdlib(name: String): Boolean =
+    name.startsWith("scala3-library") || name.startsWith("scala-library")
+
+  /** Fetches the scala stdlib jars matching the compiler's own version via coursier. */
+  private lazy val compilerStdlibJars: Seq[Path] =
+    val scalaVersion = dotty.tools.dotc.config.Properties.versionNumberString
+    val deps = Seq(
+      coursierapi.Dependency.of("org.scala-lang", "scala3-library_3", scalaVersion)
+    )
+    val fetch = Fetch.create().withCache(Cache.create())
+    deps.foreach(fetch.addDependencies(_))
+    fetch.fetch().asScala.toSeq.map(_.toPath)
+
   def extract(jars: Seq[Path], coord: MavenCoordinate, fqn: String): Option[String] =
     findPrimaryJar(jars, coord).flatMap { primaryJar =>
       candidateTastyEntries(fqn).iterator
@@ -32,10 +47,11 @@ object DocstringExtractor:
 
           var result: Option[String] = None
           try
+            val cp = allJars.filterNot(p => isStdlib(p.getFileName.toString)) ++ compilerStdlibJars
             TastyInspector.inspectAllTastyFiles(
               List(tmp.toString),
               Nil,
-              allJars.map(_.toString).toList
+              cp.map(_.toString).toList
             )(new Inspector:
               def inspect(using q: Quotes)(tastys: List[Tasty[q.type]]): Unit =
                 result = lookupDocstring(fqn)(using q)

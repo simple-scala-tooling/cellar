@@ -37,3 +37,26 @@ class CoordinateCompleterTest extends CatsEffectSuite:
     CoordinateCompleter.suggest(coord, Seq.empty).map { suggestions =>
       assert(suggestions.size <= 5, s"Expected at most 5 suggestions, got ${suggestions.size}")
     }
+
+  test("resolveLatest replaces 'latest' with an actual version"):
+    val coord = MavenCoordinate("org.typelevel", "cats-core_3", "latest")
+    coord.resolveLatest().map { resolved =>
+      assertNotEquals(resolved.version, "latest")
+      assert(resolved.version.nonEmpty)
+      assertEquals(resolved.group, coord.group)
+      assertEquals(resolved.artifact, coord.artifact)
+    }
+
+  test("resolveLatest is a no-op for concrete versions"):
+    val coord = MavenCoordinate("org.typelevel", "cats-core_3", "2.10.0")
+    coord.resolveLatest().map { resolved =>
+      assertEquals(resolved, coord)
+    }
+
+  test("resolveLatest raises CoordinateNotFound for nonexistent artifact"):
+    val coord = MavenCoordinate("com.nonexistent.x12345", "foo", "latest")
+    coord.resolveLatest().attempt.map {
+      case Left(_: CellarError.CoordinateNotFound) => ()
+      case Left(e)  => fail(s"Expected CoordinateNotFound, got: ${e.getClass}: ${e.getMessage}")
+      case Right(_) => fail("Expected failure for nonexistent artifact")
+    }
