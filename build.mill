@@ -15,15 +15,6 @@ trait CommonScalaModule extends ScalaModule with ScalafixModule {
 }
 
 // Minimal PomSettings for test fixtures
-def fixturePom(desc: String) = PomSettings(
-  description = desc,
-  organization = "simple-scala-tooling",
-  url = "https://github.com/simple-scala-tooling/cellar",
-  licenses = Seq(License.`MPL-2.0`),
-  versionControl = VersionControl.github("simple-scala-tooling", "cellar"),
-  developers = Seq(Developer("rochala", "Jędrzej Rochala"))
-)
-
 object lib extends CommonScalaModule {
   def mvnDeps = Seq(
     mvn"org.typelevel::cats-effect:3.5.7",
@@ -117,6 +108,15 @@ def publishFixtures() = Task.Command {
   fixtureScala2.publishM2Local()()
   fixtureScala3.publishM2Local()()
 }
+
+def fixturePom(desc: String) = PomSettings(
+  description = desc,
+  organization = "cellar.test",
+  url = "https://github.com/example/cellar",
+  licenses = Seq(License.`Apache-2.0`),
+  versionControl = VersionControl.github("example", "cellar"),
+  developers = Seq.empty
+)
 
 object fixtureJava extends JavaModule with PublishModule {
   def javacOptions = Seq("--release", "17")
