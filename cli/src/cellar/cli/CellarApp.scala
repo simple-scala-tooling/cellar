@@ -13,7 +13,7 @@ object CellarApp
     extends CommandIOApp(
       name = "cellar",
       header = "Inspect Maven-published JVM dependency APIs",
-      version = "0.1.0-SNAPSHOT"
+      version = BuildInfo.version
     ):
 
   override def main: Opts[IO[ExitCode]] =
