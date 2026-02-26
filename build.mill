@@ -5,6 +5,7 @@ import mill._
 import mill.scalalib._
 import mill.scalalib.Assembly
 import mill.scalalib.publish._
+import mill.javalib.NativeImageModule
 import com.goyeau.mill.scalafix.ScalafixModule
 
 trait CommonScalaModule extends ScalaModule with ScalafixModule {
@@ -16,11 +17,11 @@ trait CommonScalaModule extends ScalaModule with ScalafixModule {
 // Minimal PomSettings for test fixtures
 def fixturePom(desc: String) = PomSettings(
   description = desc,
-  organization = "cellar.test",
-  url = "https://github.com/example/cellar",
-  licenses = Seq(License.`Apache-2.0`),
-  versionControl = VersionControl.github("example", "cellar"),
-  developers = Seq.empty
+  organization = "simple-scala-tooling",
+  url = "https://github.com/simple-scala-tooling/cellar",
+  licenses = Seq(License.`MPL-2.0`),
+  versionControl = VersionControl.github("simple-scala-tooling", "cellar"),
+  developers = Seq(Developer("rochala", "Jędrzej Rochala"))
 )
 
 object lib extends CommonScalaModule {
@@ -52,9 +53,19 @@ object lib extends CommonScalaModule {
   }
 }
 
-object cli extends CommonScalaModule {
+object cli extends CommonScalaModule with NativeImageModule {
   def moduleDeps = Seq(lib)
   def mainClass = Some("cellar.cli.CellarApp")
+
+  def jvmVersion = "graalvm-community:23.0.2"
+
+  def nativeImageOptions = Seq(
+    "--no-fallback",
+    "--enable-url-protocols=http,https",
+    "-H:+ReportExceptionStackTraces",
+    "-H:+AllowJRTFileSystem"
+  )
+
   def mvnDeps = Seq(
     mvn"com.monovore::decline:2.4.1",
     mvn"com.monovore::decline-effect:2.4.1"
