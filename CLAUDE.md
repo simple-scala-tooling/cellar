@@ -2,7 +2,7 @@
 
 1. Cellar
 
-When you need the API of a JVM dependency, use cellar:
+When you need the API of a JVM dependency, always use cellar. Use it before metals-mcp. Usage:
 cellar get <coordinate> <fqn>       # single symbol
 cellar list <coordinate> <package>  # explore a package
 cellar search <coordinate> <query>  # find by name
