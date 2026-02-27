@@ -13,15 +13,30 @@ object JreClasspath:
     * not the JRT root `/`, so that relative class paths resolve correctly.
     */
   def jrtPath(): IO[Seq[Path]] =
-    sys.env.get("JAVA_HOME").map(h => jrtPath(Path.of(h))).getOrElse {
-      IO.blocking {
-        val fs = FileSystems.getFileSystem(URI.create("jrt:/"))
-        Files.list(fs.getPath("modules")).iterator().asScala.toSeq
-      }.adaptError { case _ =>
-        new RuntimeException(
-          "Could not locate JRE classpath. Set JAVA_HOME or pass --java-home pointing to a JDK installation."
-        )
+    bundledJrePath().orElse {
+      sys.env.get("JAVA_HOME").map(h => jrtPath(Path.of(h))).getOrElse {
+        IO.blocking {
+          val fs = FileSystems.getFileSystem(URI.create("jrt:/"))
+          Files.list(fs.getPath("modules")).iterator().asScala.toSeq
+        }.adaptError { case _ =>
+          new RuntimeException(
+            "Could not locate JRE classpath. Set JAVA_HOME or pass --java-home pointing to a JDK installation."
+          )
+        }
       }
+    }
+
+  private def bundledJrePath(): IO[Seq[Path]] =
+    IO.blocking {
+      val stream = getClass.getResourceAsStream("/jre.jar")
+      if stream == null then throw new RuntimeException("No bundled jre.jar")
+      val cacheDir = Path.of(System.getProperty("user.home"), ".cellar")
+      Files.createDirectories(cacheDir)
+      val cached = cacheDir.resolve("jre.jar")
+      if !Files.exists(cached) then
+        Files.copy(stream, cached)
+      stream.close()
+      Seq(cached)
     }
 
   def jrtPath(javaHome: Path): IO[Seq[Path]] =

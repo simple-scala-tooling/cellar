@@ -1,6 +1,7 @@
 package cellar
 
 import cats.effect.{IO, Resource}
+import cats.syntax.monadError.*
 import coursierapi.Repository
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
@@ -12,7 +13,13 @@ object ContextResource:
     Resource.eval {
       val allPaths = (jrePaths ++ jars).toList
       for
-        classpath <- IO.blocking(readClasspathRobust(allPaths))
+        classpath <- IO.blocking(readClasspathRobust(allPaths)).adaptError { case e =>
+                       new RuntimeException(
+                         s"Failed to load classpath (${e.getClass.getSimpleName}: ${e.getMessage}). " +
+                           "If JRE paths are invalid, set JAVA_HOME or use --java-home.",
+                         e
+                       )
+                     }
         ctx       <- IO.blocking(Context.initialize(classpath))
       yield (ctx, classpath)
     }
