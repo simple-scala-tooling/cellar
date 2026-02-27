@@ -78,7 +78,8 @@ object cli extends CommonScalaModule with NativeImageModule {
     "--no-fallback",
     "--enable-url-protocols=http,https",
     "-H:+ReportExceptionStackTraces",
-    "-H:+AllowJRTFileSystem"
+    "-H:+AllowJRTFileSystem",
+    "--add-opens=java.base/jdk.internal.jrtfs=ALL-UNNAMED"
   )
 
   def mvnDeps = Seq(
