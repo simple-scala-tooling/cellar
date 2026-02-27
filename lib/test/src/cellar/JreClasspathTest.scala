@@ -6,7 +6,8 @@ import java.nio.file.{Files, Path}
 
 class JreClasspathTest extends CatsEffectSuite:
 
-  test("zero-arg jrtPath returns non-empty classpath"):
+  test("zero-arg jrtPath with JAVA_HOME set returns non-empty classpath"):
+    assume(sys.env.contains("JAVA_HOME"), "JAVA_HOME not set")
     JreClasspath.jrtPath().map { classpath =>
       assert(classpath.nonEmpty)
     }
