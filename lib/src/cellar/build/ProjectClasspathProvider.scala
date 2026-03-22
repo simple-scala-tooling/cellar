@@ -10,7 +10,7 @@ object ProjectClasspathProvider:
   def provide(
       cwd: Path,
       module: Option[String],
-      jrePaths: Classpath,
+      jrePaths: Seq[Path],
       noCache: Boolean,
       millBinary: String = "./mill"
   ): Resource[IO, (Context, Classpath)] =

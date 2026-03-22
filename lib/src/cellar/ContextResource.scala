@@ -1,28 +1,20 @@
 package cellar
 
 import cats.effect.{IO, Resource}
-import cats.syntax.monadError.*
 import cellar.build.BuildTool
 import coursierapi.Repository
-import tastyquery.Classpaths
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
 import tastyquery.jdk.ClasspathLoaders
 import java.nio.file.Path
 
 object ContextResource:
-  def make(jars: Seq[Path], jreClasspath: Classpath): Resource[IO, (Context, Classpath)] =
+  def make(jars: Seq[Path], jrePaths: Seq[Path]): Resource[IO, (Context, Classpath)] =
     Resource.eval {
+      val allPaths = (jrePaths ++ jars).toList
       for
-        jarClasspath <- IO.blocking(readClasspathRobust(jars.toList)).adaptError { case e =>
-                          new RuntimeException(
-                            s"Failed to load classpath (${e.getClass.getSimpleName}: ${e.getMessage}). " +
-                              "If JRE paths are invalid, set JAVA_HOME or use --java-home.",
-                            e
-                          )
-                        }
-        classpath    = jreClasspath ++ jarClasspath
-        ctx          <- IO.blocking(Context.initialize(classpath))
+        classpath <- IO.blocking(readClasspathRobust(allPaths))
+        ctx       <- IO.blocking(Context.initialize(classpath))
       yield (ctx, classpath)
     }
 
@@ -44,19 +36,19 @@ object ContextResource:
   def makeFromBuildTool(
       buildTool: BuildTool,
       module: Option[String],
-      jreClasspath: Classpath
+      jrePaths: Seq[Path]
   ): Resource[IO, (Context, Classpath)] =
     Resource.eval(buildTool.extractClasspath(module)).flatMap { paths =>
-      make(paths, jreClasspath)
+      make(paths, jrePaths)
     }
 
   def makeFromCoord(
       coord: MavenCoordinate,
-      jreClasspath: Classpath,
+      jrePaths: Seq[Path],
       extraRepositories: Seq[Repository] = Seq.empty
   ): Resource[IO, (Context, Classpath)] =
     Resource.eval(CoursierFetchClient.fetchClasspath(coord, extraRepositories)).flatMap { jars =>
-      make(jars, jreClasspath).evalMap { (ctx, classpath) =>
+      make(jars, jrePaths).evalMap { (ctx, classpath) =>
         IO.blocking {
           if jars.nonEmpty then
             val jarEntries = classpath.filter(_.toString.endsWith(".jar"))
