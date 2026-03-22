@@ -28,7 +28,9 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
   private def withTempDir(test: Path => IO[Unit]): IO[Unit] =
     IO.blocking(Files.createTempDirectory("cellar-test-")).flatMap { dir =>
       test(dir).guarantee(IO.blocking {
-        Files.walk(dir).sorted(java.util.Comparator.reverseOrder()).forEach(Files.deleteIfExists(_))
+        val stream = Files.walk(dir)
+        try stream.sorted(java.util.Comparator.reverseOrder()).forEach(Files.deleteIfExists(_))
+        finally stream.close()
       })
     }
 

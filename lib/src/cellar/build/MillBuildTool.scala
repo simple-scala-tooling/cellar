@@ -73,8 +73,10 @@ class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
       .directory(cwd.toFile)
       .start()
     val stdout = new String(result.getInputStream.readAllBytes())
-    result.waitFor()
-    stdout.linesIterator.filter(_.nonEmpty).map(cwd.resolve).toList
+    if result.waitFor() == 0 then
+      stdout.linesIterator.filter(_.nonEmpty).map(cwd.resolve).toList
+    else
+      fingerprintFromDisk()
 
   private def fingerprintFromDisk(): List[Path] =
     val candidates = List("build.mill", "build.sc", "build.mill.yaml", "build.yaml", ".mill-version")

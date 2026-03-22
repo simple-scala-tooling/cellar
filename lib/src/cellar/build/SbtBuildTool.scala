@@ -52,8 +52,10 @@ class SbtBuildTool(cwd: Path) extends BuildTool:
       .directory(cwd.toFile)
       .start()
     val stdout = new String(result.getInputStream.readAllBytes())
-    result.waitFor()
-    stdout.linesIterator.filter(_.nonEmpty).map(cwd.resolve).toList
+    if result.waitFor() == 0 then
+      stdout.linesIterator.filter(_.nonEmpty).map(cwd.resolve).toList
+    else
+      fingerprintFromDisk()
 
   private def fingerprintFromDisk(): List[Path] =
     val candidates = List("build.sbt", "project/build.properties", "project/plugins.sbt")
