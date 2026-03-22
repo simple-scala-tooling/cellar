@@ -299,7 +299,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |""".stripMargin
       )) >>
         handlers.ProjectGetHandler.run("example.MyClass", module = None, cwd = Some(dir)).map { code =>
-          assertEquals(code, ExitCode.Success)
+          assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}")
           assert(console.outBuf.toString.contains("MyClass"), s"Output: ${console.outBuf}")
           assert(console.outBuf.toString.contains("hello"), s"Output: ${console.outBuf}")
         }
@@ -452,9 +452,8 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       given Console[IO] = console
       IO.blocking {
         Files.writeString(dir.resolve("build.sbt"),
-          """name := "cellar-test"
-            |version := "0.1.0"
-            |scalaVersion := "3.8.1"
+          """lazy val `cellar-test` = (project in file("."))
+            |  .settings(scalaVersion := "3.8.1")
             |""".stripMargin
         )
         Files.createDirectories(dir.resolve("project"))
