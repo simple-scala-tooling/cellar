@@ -1,7 +1,6 @@
 package cellar
 
 import cats.effect.{IO, Resource}
-import cellar.build.BuildTool
 import coursierapi.Repository
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
@@ -32,15 +31,6 @@ object ContextResource:
         bad match
           case Some(offender) => readClasspathRobust(paths.filterNot(_ == offender))
           case None           => throw e
-
-  def makeFromBuildTool(
-      buildTool: BuildTool,
-      module: Option[String],
-      jrePaths: Seq[Path]
-  ): Resource[IO, (Context, Classpath)] =
-    Resource.eval(buildTool.extractClasspath(module)).flatMap { paths =>
-      make(paths, jrePaths)
-    }
 
   def makeFromCoord(
       coord: MavenCoordinate,

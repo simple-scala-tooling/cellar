@@ -6,6 +6,7 @@ import cellar.process.ProcessRunner
 import java.nio.file.{Files, Path}
 
 class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
+  def kind: BuildToolKind = BuildToolKind.Mill
   def name: String = "Mill"
 
   def compile(module: Option[String]): IO[Unit] =
@@ -42,9 +43,7 @@ class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
         case Left(err)    => IO.raiseError(CellarError.ClasspathExtractionFailed(BuildToolKind.Mill, err))
         case Right(paths) => IO.pure(classesDir.toList ++ paths)
 
-  /** Extract the "classes" path from `mill show <mod>.compile` JSON output. */
   private def parseClassesDir(stdout: String): Option[Path] =
-    // Output is JSON like: {"analysisFile":"...","classes":"ref:v0:<hash>:<path>"}
     val marker = "\"classes\""
     stdout.indexOf(marker) match
       case -1 => None
@@ -52,22 +51,20 @@ class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
         val afterColon = stdout.indexOf(':', idx + marker.length)
         if afterColon == -1 then None
         else
-          // Find the quoted value after "classes":
           val valueStart = stdout.indexOf('"', afterColon + 1)
           val valueEnd = stdout.indexOf('"', valueStart + 1)
           if valueStart == -1 || valueEnd == -1 then None
           else
             val raw = stdout.substring(valueStart + 1, valueEnd)
-            // Handle ref: or qref: prefixed paths
+            // Handle ref: or qref: prefixed paths by finding ":/" before the absolute path
             val path = raw.lastIndexOf(":/") match
               case -1  => raw
               case i   => raw.substring(i + 1)
             Some(Path.of(path)).filter(Files.isDirectory(_))
 
-  def fingerprintFiles(module: Option[String]): IO[List[Path]] =
+  def fingerprintFiles(): IO[List[Path]] =
     IO.blocking {
-      val isGit = Files.isDirectory(cwd.resolve(".git"))
-      if isGit then fingerprintFromGit()
+      if Files.isDirectory(cwd.resolve(".git")) then fingerprintFromGit()
       else fingerprintFromDisk()
     }
 
@@ -86,11 +83,8 @@ class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
     val millBuildDir = cwd.resolve("mill-build")
     val millBuildFiles =
       if Files.isDirectory(millBuildDir) then
-        Files.list(millBuildDir).toArray.map(_.asInstanceOf[Path]).toList
+        val stream = Files.list(millBuildDir)
+        try stream.toArray.map(_.asInstanceOf[Path]).toList
+        finally stream.close()
       else Nil
     files ++ millBuildFiles
-
-  private def requireModule(module: Option[String]): IO[String] =
-    module match
-      case Some(m) => IO.pure(m)
-      case None    => IO.raiseError(CellarError.ModuleRequired(BuildToolKind.Mill))

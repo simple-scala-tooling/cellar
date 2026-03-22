@@ -25,9 +25,8 @@ object GetHandler:
         }
       yield result
 
-    program.handleErrorWith {
-      case e: CellarError => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
-      case e: Throwable   => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
+    program.handleErrorWith { case e: Throwable =>
+      Console[IO].errorln(e.getMessage).as(ExitCode.Error)
     }
 
   /** Core get logic shared by coordinate-based and project-aware flows. */

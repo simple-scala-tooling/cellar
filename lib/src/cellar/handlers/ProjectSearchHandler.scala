@@ -16,17 +16,7 @@ object ProjectSearchHandler:
       cwd: Option[Path] = None,
       millBinary: String = "./mill"
   )(using Console[IO]): IO[ExitCode] =
-    val program =
-      for
-        jrePaths   <- javaHome.fold(JreClasspath.jrtPath())(JreClasspath.jrtPath)
-        workingDir <- cwd.fold(IO.blocking(Path.of(System.getProperty("user.dir"))))(IO.pure)
-        result     <- build.ProjectClasspathProvider.provide(workingDir, module, jrePaths, noCache, millBinary).use { (ctx, classpath) =>
-          given Context = ctx
-          SearchHandler.runCore(query, limit, classpath, jrePaths)
-        }
-      yield result
-
-    program.handleErrorWith {
-      case e: CellarError => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
-      case e: Throwable   => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
+    ProjectHandler.run(javaHome, cwd, module, noCache, millBinary) { (ctx, classpath, jrePaths) =>
+      given Context = ctx
+      SearchHandler.runCore(query, limit, classpath, jrePaths)
     }

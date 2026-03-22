@@ -32,16 +32,12 @@ object ProjectClasspathProvider:
     val moduleKey = module.getOrElse("")
 
     for
-      fingerFiles <- buildTool.fingerprintFiles(module)
+      fingerFiles <- buildTool.fingerprintFiles()
       hash        <- BuildFingerprint.compute(fingerFiles, moduleKey)
       cached      <- cache.get(hash)
       paths <- cached match
-        case Some(paths) =>
-          // Cache hit: still compile to update class files, then use cached classpath
-          buildTool.compile(module).as(paths)
-        case None =>
-          // Cache miss: extract (which compiles), then cache
-          buildTool.extractClasspath(module).flatTap(paths => cache.put(hash, paths))
+        case Some(paths) => buildTool.compile(module).as(paths)
+        case None        => buildTool.extractClasspath(module).flatTap(paths => cache.put(hash, paths))
     yield paths
 
   private def instantiate(kind: BuildToolKind, cwd: Path, millBinary: String): BuildTool = kind match

@@ -14,12 +14,16 @@ object ProcessRunner:
       builder.redirectErrorStream(false)
       val process = builder.start()
       try
+        // Drain stderr on a separate thread to avoid pipe buffer deadlock
+        @volatile var stderr = ""
+        val stderrDrainer = Thread.startVirtualThread { () =>
+          stderr = new String(process.getErrorStream.readAllBytes())
+        }
         val stdout = new String(process.getInputStream.readAllBytes())
-        val stderr = new String(process.getErrorStream.readAllBytes())
+        stderrDrainer.join()
         val exitCode = process.waitFor()
         ProcessResult(exitCode, stdout, stderr)
       finally process.destroyForcibly()
-    }.onCancel(IO.unit) // process destroyed in finally
-      .adaptError { case e: java.io.IOException =>
-        new RuntimeException(s"Command not found: '${command.headOption.getOrElse("")}'. Ensure it is installed and on PATH.", e)
-      }
+    }.adaptError { case e: java.io.IOException =>
+      new RuntimeException(s"Command not found: '${command.headOption.getOrElse("")}'. Ensure it is installed and on PATH.", e)
+    }

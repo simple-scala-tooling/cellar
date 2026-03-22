@@ -6,6 +6,7 @@ import cellar.process.ProcessRunner
 import java.nio.file.{Files, Path}
 
 class SbtBuildTool(cwd: Path) extends BuildTool:
+  def kind: BuildToolKind = BuildToolKind.Sbt
   def name: String = "sbt"
 
   def compile(module: Option[String]): IO[Unit] =
@@ -22,13 +23,12 @@ class SbtBuildTool(cwd: Path) extends BuildTool:
         if result.exitCode != 0 then
           IO.raiseError(CellarError.CompilationFailed(BuildToolKind.Sbt, extractErrors(result.stdout, result.stderr)))
         else
-          // Filter sbt logging noise — classpath line doesn't start with [
           val classpathLine = result.stdout.linesIterator
             .filter(_.nonEmpty)
             .filter(line => !line.startsWith("["))
             .filter(_.contains(java.io.File.separator))
             .toList
-            .sortBy(-_.length) // longest line is most likely the classpath
+            .sortBy(-_.length)
             .headOption
 
           classpathLine match
@@ -41,10 +41,9 @@ class SbtBuildTool(cwd: Path) extends BuildTool:
       }
     }
 
-  def fingerprintFiles(module: Option[String]): IO[List[Path]] =
+  def fingerprintFiles(): IO[List[Path]] =
     IO.blocking {
-      val isGit = Files.isDirectory(cwd.resolve(".git"))
-      if isGit then fingerprintFromGit()
+      if Files.isDirectory(cwd.resolve(".git")) then fingerprintFromGit()
       else fingerprintFromDisk()
     }
 
@@ -63,15 +62,12 @@ class SbtBuildTool(cwd: Path) extends BuildTool:
     val projectDir = cwd.resolve("project")
     val projectFiles =
       if Files.isDirectory(projectDir) then
-        Files.list(projectDir).toArray.map(_.asInstanceOf[Path]).toList
+        val stream = Files.list(projectDir)
+        try stream.toArray.map(_.asInstanceOf[Path]).toList
           .filter(p => p.toString.endsWith(".sbt") || p.toString.endsWith(".scala"))
+        finally stream.close()
       else Nil
     (files ++ projectFiles).distinct
-
-  private def requireModule(module: Option[String]): IO[String] =
-    module match
-      case Some(m) => IO.pure(m)
-      case None    => IO.raiseError(CellarError.ModuleRequired(BuildToolKind.Sbt))
 
   private def extractErrors(stdout: String, stderr: String): String =
     val errorLines = stdout.linesIterator.filter(_.startsWith("[error]")).mkString("\n")

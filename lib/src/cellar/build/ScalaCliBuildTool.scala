@@ -6,6 +6,7 @@ import cellar.process.ProcessRunner
 import java.nio.file.Path
 
 class ScalaCliBuildTool(cwd: Path) extends BuildTool:
+  def kind: BuildToolKind = BuildToolKind.ScalaCli
   def name: String = "scala-cli"
 
   def compile(module: Option[String]): IO[Unit] =
@@ -26,7 +27,7 @@ class ScalaCliBuildTool(cwd: Path) extends BuildTool:
             case Right(paths) => IO.pure(paths)
       }
 
-  def fingerprintFiles(module: Option[String]): IO[List[Path]] = IO.pure(Nil)
+  def fingerprintFiles(): IO[List[Path]] = IO.pure(Nil)
 
   private def rejectModule(module: Option[String]): IO[Unit] =
     module match

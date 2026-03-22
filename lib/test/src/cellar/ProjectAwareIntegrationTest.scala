@@ -14,19 +14,6 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   override def munitTimeout = scala.concurrent.duration.Duration(120, "s")
 
-  // --- Helpers ---
-
-  class CapturingConsole extends Console[IO]:
-    val outBuf: StringBuilder = new StringBuilder
-    val errBuf: StringBuilder = new StringBuilder
-    def readLineWithCharset(charset: java.nio.charset.Charset): IO[String] = IO.pure("")
-    def print[A](a: A)(using fmt: cats.Show[A]): IO[Unit]                 = IO.unit
-    def println[A](a: A)(using fmt: cats.Show[A]): IO[Unit] =
-      IO { outBuf.append(fmt.show(a)).append('\n'); () }
-    def error[A](a: A)(using fmt: cats.Show[A]): IO[Unit] = IO.unit
-    def errorln[A](a: A)(using fmt: cats.Show[A]): IO[Unit] =
-      IO { errBuf.append(fmt.show(a)).append('\n'); () }
-
   /** Path to the mill wrapper from the project root, injected via build.mill forkArgs. */
   private lazy val millBinary: String =
     Option(System.getProperty("cellar.test.millBinary")).getOrElse("mill")
@@ -182,7 +169,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     }
 
   test("ScalaCliBuildTool: fingerprintFiles returns empty"):
-    build.ScalaCliBuildTool(Path.of(".")).fingerprintFiles(None).map { files =>
+    build.ScalaCliBuildTool(Path.of(".")).fingerprintFiles().map { files =>
       assert(files.isEmpty)
     }
 
