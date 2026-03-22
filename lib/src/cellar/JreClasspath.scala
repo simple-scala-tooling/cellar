@@ -1,7 +1,6 @@
 package cellar
 
 import cats.effect.IO
-import java.io.ByteArrayInputStream
 import java.net.{URI, URLClassLoader}
 import java.nio.file.{Files, FileSystems, Path}
 import java.util.zip.ZipInputStream
@@ -60,14 +59,14 @@ object JreClasspath:
         throw new RuntimeException(
           "Bundled JRE not found. This is a build error — please report it."
         )
-      try parseJarToClasspath(stream.readAllBytes())
+      try parseStreamToClasspath(stream)
       finally stream.close()
     }
 
-  private def parseJarToClasspath(jarBytes: Array[Byte]): Classpaths.Classpath =
+  private def parseStreamToClasspath(input: java.io.InputStream): Classpaths.Classpath =
     val pkgMap = mutable.LinkedHashMap[String, mutable.LinkedHashMap[String, (Option[IArray[Byte]], Option[IArray[Byte]])]]()
 
-    val zis = new ZipInputStream(new ByteArrayInputStream(jarBytes))
+    val zis = new ZipInputStream(input)
     var entry = zis.getNextEntry()
     while entry != null do
       val name = entry.getName

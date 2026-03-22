@@ -28,7 +28,6 @@ object ListHandler:
       Console[IO].errorln(e.getMessage).as(ExitCode.Error)
     }
 
-  /** Core list logic shared by coordinate-based and project-aware flows. */
   def runCore(
       fqn: String,
       limit: Int,
@@ -39,10 +38,7 @@ object ListHandler:
         val ctx = coord.fold(s"'$fqn' not found.")(c => s"'$fqn' not found in '${c.render}'.")
         Console[IO].errorln(ctx).as(ExitCode.Error)
       case ListResolveResult.PartialMatch(resolvedFqn, missingMember) =>
-        val msg = coord match
-          case Some(c) => CellarError.PartialResolution(fqn, c, resolvedFqn, missingMember).getMessage
-          case None    => s"Symbol '$fqn' not found. Resolved up to '$resolvedFqn' but member '$missingMember' was not found."
-        Console[IO].errorln(msg).as(ExitCode.Error)
+        Console[IO].errorln(CellarError.PartialResolution(fqn, coord, resolvedFqn, missingMember).getMessage).as(ExitCode.Error)
       case ListResolveResult.Found(target) =>
         val memberStream = SymbolLister
           .listMembers(target)

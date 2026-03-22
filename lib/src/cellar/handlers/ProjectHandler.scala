@@ -7,7 +7,6 @@ import java.nio.file.Path
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
 
-/** Shared infrastructure for project-aware handlers. */
 object ProjectHandler:
   def run(
       javaHome: Option[Path],

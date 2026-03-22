@@ -7,7 +7,6 @@ import java.nio.file.{Files, Path}
 
 class SbtBuildTool(cwd: Path) extends BuildTool:
   def kind: BuildToolKind = BuildToolKind.Sbt
-  def name: String = "sbt"
 
   def compile(module: Option[String]): IO[Unit] =
     requireModule(module).flatMap { mod =>

@@ -6,7 +6,6 @@ import java.nio.file.Path
 
 trait BuildTool:
   def kind: BuildToolKind
-  def name: String
   def compile(module: Option[String]): IO[Unit]
   def extractClasspath(module: Option[String]): IO[List[Path]]
   def fingerprintFiles(): IO[List[Path]]

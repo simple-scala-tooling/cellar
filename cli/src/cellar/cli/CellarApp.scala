@@ -53,8 +53,6 @@ object CellarApp
       case Left(err)    => IO.pure(Left(err))
       case Right(coord) => coord.resolveLatest(extraRepos).map(Right(_))
 
-  // --- Project-aware commands ---
-
   private val getSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get", "Fetch symbol info from the current project") {
       (symbolArg, moduleOpt, javaHomeOpt, noCacheOpt).mapN { (fqn, module, javaHome, noCache) =>
@@ -76,8 +74,6 @@ object CellarApp
           ProjectSearchHandler.run(query, module, limit, javaHome, noCache)
       }
     }
-
-  // --- External (coordinate-based) commands ---
 
   private val getExternalSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get-external", "Fetch symbol info from a Maven coordinate") {

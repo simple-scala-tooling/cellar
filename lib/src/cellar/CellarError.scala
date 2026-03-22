@@ -29,10 +29,11 @@ object CellarError:
       if nearMatches.isEmpty then base
       else s"$base Did you mean one of: ${nearMatches.mkString(", ")}?"
 
-  final case class PartialResolution(fqn: String, coord: MavenCoordinate, resolvedFqn: String, missingMember: String)
+  final case class PartialResolution(fqn: String, coord: Option[MavenCoordinate], resolvedFqn: String, missingMember: String)
       extends CellarError:
     override def getMessage: String =
-      s"Symbol '$fqn' not found in '${coord.render}'. Resolved up to '$resolvedFqn' but member '$missingMember' was not found."
+      val context = coord.fold("")(c => s" in '${c.render}'")
+      s"Symbol '$fqn' not found$context. Resolved up to '$resolvedFqn' but member '$missingMember' was not found."
 
   final case class PackageGivenToGet(fqn: String) extends CellarError:
     override def getMessage: String =
@@ -46,13 +47,6 @@ object CellarError:
       extends CellarError:
     override def getMessage: String =
       s"Symbol '$fqn' exists in multiple JARs on the classpath: '$firstJar' and '$duplicateJar'."
-
-  // --- Project-aware errors ---
-
-  final case class BuildToolNotOnPath(tool: BuildToolKind, binary: String, markerFile: String)
-      extends CellarError:
-    override def getMessage: String =
-      s"${toolName(tool)} detected ($markerFile found) but '$binary' is not on PATH."
 
   final case class ModuleRequired(tool: BuildToolKind) extends CellarError:
     override def getMessage: String =

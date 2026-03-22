@@ -7,7 +7,6 @@ import java.nio.file.Path
 
 class ScalaCliBuildTool(cwd: Path) extends BuildTool:
   def kind: BuildToolKind = BuildToolKind.ScalaCli
-  def name: String = "scala-cli"
 
   def compile(module: Option[String]): IO[Unit] =
     rejectModule(module) >>

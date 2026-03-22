@@ -29,7 +29,6 @@ object GetHandler:
       Console[IO].errorln(e.getMessage).as(ExitCode.Error)
     }
 
-  /** Core get logic shared by coordinate-based and project-aware flows. */
   def runCore(
       fqn: String,
       classpath: Classpath,
@@ -50,10 +49,7 @@ object GetHandler:
           s"'$fqn' is a package. Use 'cellar list $fqn' to explore package contents."
         ).as(ExitCode.Error)
       case LookupResult.PartialMatch(resolvedFqn, missingMember) =>
-        val msg = coord match
-          case Some(c) => CellarError.PartialResolution(fqn, c, resolvedFqn, missingMember).getMessage
-          case None    => s"Symbol '$fqn' not found. Resolved up to '$resolvedFqn' but member '$missingMember' was not found."
-        Console[IO].errorln(msg).as(ExitCode.Error)
+        Console[IO].errorln(CellarError.PartialResolution(fqn, coord, resolvedFqn, missingMember).getMessage).as(ExitCode.Error)
       case LookupResult.NotFound =>
         coord match
           case Some(c) =>

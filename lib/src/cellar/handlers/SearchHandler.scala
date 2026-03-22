@@ -28,7 +28,6 @@ object SearchHandler:
       Console[IO].errorln(e.getMessage).as(ExitCode.Error)
     }
 
-  /** Core search logic shared by coordinate-based and project-aware flows. */
   def runCore(
       query: String,
       limit: Int,

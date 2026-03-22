@@ -14,7 +14,6 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   override def munitTimeout = scala.concurrent.duration.Duration(120, "s")
 
-  /** Path to the mill wrapper from the project root, injected via build.mill forkArgs. */
   private lazy val millBinary: String =
     Option(System.getProperty("cellar.test.millBinary")).getOrElse("mill")
 
@@ -22,6 +21,9 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     val result = new ProcessBuilder("which", binary).start()
     result.getInputStream.readAllBytes()
     result.waitFor() == 0
+
+  private def isBinaryAvailable(binary: String): Boolean =
+    java.nio.file.Files.isRegularFile(Path.of(binary)) || isOnPath(binary)
 
   private def withTempDir(test: Path => IO[Unit]): IO[Unit] =
     IO.blocking(Files.createTempDirectory("cellar-test-")).flatMap { dir =>
@@ -396,9 +398,10 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
         }
     }
 
-  // --- End-to-end Mill tests (uses ./mill wrapper from project root) ---
+  // --- End-to-end Mill tests (requires mill on PATH) ---
 
   test("E2E Mill: get resolves project symbol"):
+    assume(isBinaryAvailable(millBinary), s"$millBinary not found")
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
@@ -429,6 +432,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     }
 
   test("E2E Mill: --module required"):
+    assume(isBinaryAvailable(millBinary), s"$millBinary not found")
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console

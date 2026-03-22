@@ -7,7 +7,6 @@ import java.nio.file.{Files, Path}
 
 class MillBuildTool(cwd: Path, binary: String = "./mill") extends BuildTool:
   def kind: BuildToolKind = BuildToolKind.Mill
-  def name: String = "Mill"
 
   def compile(module: Option[String]): IO[Unit] =
     requireModule(module).flatMap { mod =>
