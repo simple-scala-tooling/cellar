@@ -23,11 +23,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install scala-cli and sbt
-        run: |
-          curl -fL "https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz" | gzip -d > /usr/local/bin/cs
-          chmod +x /usr/local/bin/cs
-          cs install scala-cli sbt
-          echo "$HOME/.local/share/coursier/bin" >> "$GITHUB_PATH"
+      - uses: VirtusLab/scala-cli-setup@main
+        with:
+          jvm: temurin:17
+          apps: sbt
 
       - run: ./mill _.test
