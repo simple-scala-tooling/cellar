@@ -23,4 +23,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - uses: VirtusLab/scala-cli-setup@main
+        with:
+          jvm: temurin:17
+          apps: sbt
+
+      - name: Warm up scala-cli Bloop server
+        run: echo 'object W' > /tmp/W.scala && scala-cli compile /tmp/W.scala
+
       - run: ./mill _.test

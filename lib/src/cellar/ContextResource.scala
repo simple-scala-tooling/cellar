@@ -3,7 +3,6 @@ package cellar
 import cats.effect.{IO, Resource}
 import cats.syntax.monadError.*
 import coursierapi.Repository
-import tastyquery.Classpaths
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
 import tastyquery.jdk.ClasspathLoaders

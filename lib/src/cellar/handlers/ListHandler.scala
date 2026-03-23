@@ -20,27 +20,30 @@ object ListHandler:
         jreClasspath <- javaHome.fold(JreClasspath.jrtPath())(JreClasspath.jrtPath)
         result   <- ContextResource.makeFromCoord(coord, jreClasspath, extraRepositories).use { (ctx, _) =>
           given tastyquery.Contexts.Context = ctx
-          SymbolLister.resolve(fqn).flatMap {
-            case ListResolveResult.NotFound =>
-              Console[IO]
-                .errorln(s"'$fqn' not found in '${coord.render}'.")
-                .as(ExitCode.Error)
-            case ListResolveResult.PartialMatch(resolvedFqn, missingMember) =>
-              Console[IO]
-                .errorln(CellarError.PartialResolution(fqn, coord, resolvedFqn, missingMember).getMessage)
-                .as(ExitCode.Error)
-            case ListResolveResult.Found(target) =>
-              val memberStream = SymbolLister
-                .listMembers(target)
-                .evalMap(sym => IO.blocking(LineFormatter.formatLine(sym)))
-              StreamOps.bounded(memberStream, limit).flatMap { lines =>
-                lines.traverse_(Console[IO].println).as(ExitCode.Success)
-              }
-          }
+          runCore(fqn, limit, Some(coord))
         }
       yield result
 
-    program.handleErrorWith {
-      case e: CellarError => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
-      case e: Throwable   => Console[IO].errorln(e.getMessage).as(ExitCode.Error)
+    program.handleErrorWith { case e: Throwable =>
+      Console[IO].errorln(e.getMessage).as(ExitCode.Error)
+    }
+
+  def runCore(
+      fqn: String,
+      limit: Int,
+      coord: Option[MavenCoordinate]
+  )(using tastyquery.Contexts.Context, Console[IO]): IO[ExitCode] =
+    SymbolLister.resolve(fqn).flatMap {
+      case ListResolveResult.NotFound =>
+        val ctx = coord.fold(s"'$fqn' not found.")(c => s"'$fqn' not found in '${c.render}'.")
+        Console[IO].errorln(ctx).as(ExitCode.Error)
+      case ListResolveResult.PartialMatch(resolvedFqn, missingMember) =>
+        Console[IO].errorln(CellarError.PartialResolution(fqn, coord, resolvedFqn, missingMember).getMessage).as(ExitCode.Error)
+      case ListResolveResult.Found(target) =>
+        val memberStream = SymbolLister
+          .listMembers(target)
+          .evalMap(sym => IO.blocking(LineFormatter.formatLine(sym)))
+        StreamOps.bounded(memberStream, limit).flatMap { lines =>
+          lines.traverse_(Console[IO].println).as(ExitCode.Success)
+        }
     }

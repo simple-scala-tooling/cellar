@@ -10,18 +10,6 @@ import munit.CatsEffectSuite
   */
 class IntegrationTest extends CatsEffectSuite:
 
-  // Capture stdout and stderr for assertions
-  class CapturingConsole extends Console[IO]:
-    val outBuf: StringBuilder = new StringBuilder
-    val errBuf: StringBuilder = new StringBuilder
-    def readLineWithCharset(charset: java.nio.charset.Charset): IO[String] = IO.pure("")
-    def print[A](a: A)(using fmt: cats.Show[A]): IO[Unit]                 = IO.unit
-    def println[A](a: A)(using fmt: cats.Show[A]): IO[Unit] =
-      IO { outBuf.append(fmt.show(a)).append('\n'); () }
-    def error[A](a: A)(using fmt: cats.Show[A]): IO[Unit] = IO.unit
-    def errorln[A](a: A)(using fmt: cats.Show[A]): IO[Unit] =
-      IO { errBuf.append(fmt.show(a)).append('\n'); () }
-
   // ─── get subcommand ──────────────────────────────────────────────────────
 
   test("get: Scala3 sealed ADT stdout contains **Known subtypes:**"):

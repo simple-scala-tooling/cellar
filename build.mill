@@ -35,7 +35,9 @@ object lib extends CommonScalaModule {
       fixtureJava.publishM2LocalCached()
       fixtureScala2.publishM2LocalCached()
       fixtureScala3.publishM2LocalCached()
+      val millAbsPath = (lib.moduleDir / os.up / "mill").toString
       Seq(
+        s"-Dcellar.test.millBinary=$millAbsPath",
         s"-Dcellar.test.localM2=${os.home / ".m2" / "repository"}",
         s"-Dcellar.test.fixtureJavaGroup=cellar.test",
         s"-Dcellar.test.fixtureJavaArtifact=cellar-fixture-java",
