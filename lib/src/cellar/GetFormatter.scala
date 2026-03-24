@@ -73,31 +73,11 @@ object GetFormatter:
   private def renderMembers(sym: Symbol)(using ctx: Context): Option[String] =
     sym match
       case cls: ClassSymbol =>
-        val members = collectClassMembers(cls)
+        val members = SymbolResolver.collectClassMembers(cls)
           .filter(PublicApiFilter.isPublic)
           .map(m => TypePrinter.printSymbolSignatureSafe(m).linesIterator.mkString(" ").trim)
         if members.isEmpty then None else Some(members.mkString("\n"))
       case _ => None
-
-  private val universalBaseClasses = Set("scala.Any", "scala.AnyRef", "java.lang.Object")
-
-  private def collectClassMembers(cls: ClassSymbol)(using ctx: Context): List[TermOrTypeSymbol] =
-    val seen   = scala.collection.mutable.Set.empty[String]
-    val result = List.newBuilder[TermOrTypeSymbol]
-    val linearization =
-      try cls.linearization
-      catch case _: Exception => List(cls)
-    for
-      klass <- linearization if !universalBaseClasses.contains(klass.displayFullName)
-      decl  <-
-        try klass.declarations
-        catch case _: Exception => Nil
-    do
-      val key = decl.name.toString
-      if !seen.contains(key) then
-        seen += key
-        result += decl
-    result.result()
 
   private def renderCompanion(sym: Symbol)(using ctx: Context): Option[String] =
     sym match

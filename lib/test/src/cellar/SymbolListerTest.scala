@@ -84,3 +84,73 @@ class SymbolListerTest extends CatsEffectSuite:
         case other => fail(s"CellarA not found, got $other")
       }
     }
+
+  test("listMembers includes all overloaded methods"):
+    withCtx { ctx =>
+      given Context = ctx
+      SymbolLister.resolve("cellar.fixture.scala3.CellarOverloaded").flatMap {
+        case ListResolveResult.Found(target) =>
+          SymbolLister.listMembers(target).compile.toList.map { syms =>
+            val processCount = syms.count(_.name.toString == "process")
+            assertEquals(processCount, 3, s"Expected 3 process overloads, got names: ${syms.map(_.name)}")
+          }
+        case other => fail(s"CellarOverloaded not found, got $other")
+      }
+    }
+
+  test("listMembers includes inherited overloaded methods"):
+    withCtx { ctx =>
+      given Context = ctx
+      SymbolLister.resolve("cellar.fixture.scala3.CellarOverloadedChild").flatMap {
+        case ListResolveResult.Found(target) =>
+          SymbolLister.listMembers(target).compile.toList.map { syms =>
+            val actionCount = syms.count(_.name.toString == "action")
+            assertEquals(actionCount, 2, s"Expected 2 action overloads, got names: ${syms.map(_.name)}")
+          }
+        case other => fail(s"CellarOverloadedChild not found, got $other")
+      }
+    }
+
+  private def withJavaCtx[A](body: Context => IO[A]): IO[A] =
+    TestFixtures.assumeFixturesAvailable()
+    for
+      jrePaths <- JreClasspath.jrtPath()
+      jars     <- CoursierFetchClient.fetchClasspath(
+                    TestFixtures.javaCoord, Seq(TestFixtures.localM2Repo))
+      result   <- ContextResource.make(jars, jrePaths).use { (ctx, _) => body(ctx) }
+    yield result
+
+  private def withScala2Ctx[A](body: Context => IO[A]): IO[A] =
+    TestFixtures.assumeFixturesAvailable()
+    for
+      jrePaths <- JreClasspath.jrtPath()
+      jars     <- CoursierFetchClient.fetchClasspath(
+                    TestFixtures.scala2Coord, Seq(TestFixtures.localM2Repo))
+      result   <- ContextResource.make(jars, jrePaths).use { (ctx, _) => body(ctx) }
+    yield result
+
+  test("listMembers includes all overloaded methods (Java)"):
+    withJavaCtx { ctx =>
+      given Context = ctx
+      SymbolLister.resolve("cellar.fixture.java.CellarJavaClass").flatMap {
+        case ListResolveResult.Found(target) =>
+          SymbolLister.listMembers(target).compile.toList.map { syms =>
+            val formatCount = syms.count(_.name.toString == "format")
+            assertEquals(formatCount, 3, s"Expected 3 format overloads, got names: ${syms.map(_.name)}")
+          }
+        case other => fail(s"CellarJavaClass not found, got $other")
+      }
+    }
+
+  test("listMembers includes all overloaded methods (Scala 2)"):
+    withScala2Ctx { ctx =>
+      given Context = ctx
+      SymbolLister.resolve("cellar.fixture.scala2.CellarOverloaded").flatMap {
+        case ListResolveResult.Found(target) =>
+          SymbolLister.listMembers(target).compile.toList.map { syms =>
+            val processCount = syms.count(_.name.toString == "process")
+            assertEquals(processCount, 3, s"Expected 3 process overloads, got names: ${syms.map(_.name)}")
+          }
+        case other => fail(s"CellarOverloaded not found, got $other")
+      }
+    }

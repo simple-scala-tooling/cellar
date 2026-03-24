@@ -4,7 +4,7 @@ import cats.effect.IO
 import tastyquery.Contexts.Context
 import tastyquery.Exceptions.MemberNotFoundException
 import tastyquery.Names.{termName, typeName}
-import tastyquery.Symbols.{ClassSymbol, Symbol}
+import tastyquery.Symbols.{ClassSymbol, Symbol, TermOrTypeSymbol}
 
 sealed trait LookupResult
 object LookupResult:
@@ -144,6 +144,33 @@ object SymbolResolver:
       if found.isDefined then best = Some((found.get, i + 1))
       i += 1
     best
+
+  private val universalBaseClasses = Set("scala.Any", "scala.AnyRef", "java.lang.Object")
+
+  /**
+   * Walk the linearization (MRO) of a class, collecting all declarations.
+   * Uses tastyquery's `overridingSymbol` to skip declarations that are
+   * overridden by a more-derived class, while preserving distinct overloads.
+   */
+  def collectClassMembers(cls: ClassSymbol)(using ctx: Context): List[TermOrTypeSymbol] =
+    val seen   = scala.collection.mutable.Set.empty[TermOrTypeSymbol]
+    val result = List.newBuilder[TermOrTypeSymbol]
+    val linearization =
+      try cls.linearization
+      catch case _: Exception => List(cls)
+    linearization.filterNot(k => universalBaseClasses.contains(k.displayFullName)).foreach { klass =>
+      val decls =
+        try klass.declarations
+        catch case _: Exception => Nil
+      decls.foreach { decl =>
+        if !seen.contains(decl) then
+          val dominated = decl.overridingSymbol(cls).exists(_ != decl)
+          if !dominated then
+            seen += decl
+            result += decl
+      }
+    }
+    result.result()
 
   private def tryOrNone[A](thunk: => A): Option[A] =
     try Some(thunk)

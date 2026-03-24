@@ -3,7 +3,7 @@ package cellar
 import cats.effect.IO
 import fs2.Stream
 import tastyquery.Contexts.Context
-import tastyquery.Symbols.{ClassSymbol, PackageSymbol, Symbol, TermOrTypeSymbol}
+import tastyquery.Symbols.{ClassSymbol, PackageSymbol, Symbol}
 
 sealed trait ListTarget
 object ListTarget:
@@ -40,26 +40,6 @@ object SymbolLister:
 
       case ListTarget.Cls(cls) =>
         Stream
-          .eval(IO.blocking(collectClassMembers(cls)))
+          .eval(IO.blocking(SymbolResolver.collectClassMembers(cls)))
           .flatMap(syms => Stream.emits(syms))
           .filter(PublicApiFilter.isPublic)
-
-  private def collectClassMembers(cls: ClassSymbol)(using ctx: Context): List[TermOrTypeSymbol] =
-    // Walk linearization (MRO), collecting decls. Deduplicate by unsigned name, keeping
-    // the most-derived occurrence (first seen in MRO order).
-    val seen      = scala.collection.mutable.Set.empty[String]
-    val result    = List.newBuilder[TermOrTypeSymbol]
-    val linearization =
-      try cls.linearization
-      catch case _: Exception => List(cls)
-    for
-      klass <- linearization
-      decl  <-
-        try klass.declarations
-        catch case _: Exception => Nil
-    do
-      val key = decl.name.toString
-      if !seen.contains(key) then
-        seen += key
-        result += decl
-    result.result()
