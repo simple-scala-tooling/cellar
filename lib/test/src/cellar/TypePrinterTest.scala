@@ -69,6 +69,26 @@ class TypePrinterTest extends CatsEffectSuite:
                 }
     yield result
 
+  test("printSymbolSignature for companion object term does not double the name"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val term = ctx.findStaticTerm("cellar.fixture.scala3.CellarTC")
+        val sig  = TypePrinter.printSymbolSignature(term)
+        assertEquals(sig, "object CellarTC")
+      }
+    }
+
+  test("printSymbolSignature for companion object class prints module class name"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls = ctx.findStaticModuleClass("cellar.fixture.scala3.CellarTC")
+        val sig = TypePrinter.printSymbolSignature(cls)
+        assert(sig.startsWith("object"), s"Expected 'object' keyword in: $sig")
+      }
+    }
+
   test("printSymbolSignatureSafe does not throw for Java symbol"):
     withCtx { ctx =>
       IO.blocking {
