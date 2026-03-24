@@ -38,4 +38,16 @@ public class CellarJavaClass<T extends Comparable<T>> implements CellarJavaInter
     public static int staticHelper(int n) {
         return n * 2;
     }
+
+    public String format(int value) {
+        return String.valueOf(value);
+    }
+
+    public String format(String value) {
+        return value;
+    }
+
+    public String format(int value, boolean verbose) {
+        return verbose ? "value=" + value : String.valueOf(value);
+    }
 }

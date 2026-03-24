@@ -107,3 +107,65 @@ class GetFormatterTest extends CatsEffectSuite:
         assert(!output.contains("---"), s"Unexpected separator: $output")
       }
     }
+
+  test("formatSymbol members includes all overloaded methods"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarOverloaded")
+        val output = GetFormatter.formatSymbol(cls)
+        val processCount = output.linesIterator.count(_.contains("def process("))
+        assertEquals(processCount, 3, s"Expected 3 process overloads in:\n$output")
+      }
+    }
+
+  test("formatSymbol members includes inherited overloaded methods"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarOverloadedChild")
+        val output = GetFormatter.formatSymbol(cls)
+        val actionCount = output.linesIterator.count(_.contains("def action("))
+        assertEquals(actionCount, 2, s"Expected 2 action overloads in:\n$output")
+      }
+    }
+
+  private def withJavaCtx[A](body: Context => IO[A]): IO[A] =
+    TestFixtures.assumeFixturesAvailable()
+    for
+      jrePaths <- JreClasspath.jrtPath()
+      jars     <- CoursierFetchClient.fetchClasspath(
+                    TestFixtures.javaCoord, Seq(TestFixtures.localM2Repo))
+      result   <- ContextResource.make(jars, jrePaths).use { (ctx, _) => body(ctx) }
+    yield result
+
+  private def withScala2Ctx[A](body: Context => IO[A]): IO[A] =
+    TestFixtures.assumeFixturesAvailable()
+    for
+      jrePaths <- JreClasspath.jrtPath()
+      jars     <- CoursierFetchClient.fetchClasspath(
+                    TestFixtures.scala2Coord, Seq(TestFixtures.localM2Repo))
+      result   <- ContextResource.make(jars, jrePaths).use { (ctx, _) => body(ctx) }
+    yield result
+
+  test("formatSymbol members includes all overloaded methods (Java)"):
+    withJavaCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.java.CellarJavaClass")
+        val output = GetFormatter.formatSymbol(cls)
+        val formatCount = output.linesIterator.count(_.contains("def format("))
+        assertEquals(formatCount, 3, s"Expected 3 format overloads in:\n$output")
+      }
+    }
+
+  test("formatSymbol members includes all overloaded methods (Scala 2)"):
+    withScala2Ctx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala2.CellarOverloaded")
+        val output = GetFormatter.formatSymbol(cls)
+        val processCount = output.linesIterator.count(_.contains("def process("))
+        assertEquals(processCount, 3, s"Expected 3 process overloads in:\n$output")
+      }
+    }
