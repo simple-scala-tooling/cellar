@@ -3,7 +3,7 @@ package cellar.handlers
 import cats.effect.{ExitCode, IO}
 import cats.effect.std.Console
 import cellar.*
-import java.nio.file.Path
+import fs2.io.file.Path
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
 
@@ -18,7 +18,7 @@ object ProjectHandler:
     val program =
       for
         jreClasspath <- javaHome.fold(JreClasspath.jrtPath())(JreClasspath.jrtPath)
-        workingDir   <- cwd.fold(IO.blocking(Path.of(System.getProperty("user.dir"))))(IO.pure)
+        workingDir   <- cwd.fold(IO.blocking(Path(System.getProperty("user.dir"))))(IO.pure)
         result       <- build.ProjectClasspathProvider.provide(workingDir, module, jreClasspath, noCache, millBinary).use { (ctx, classpath) =>
           body(ctx, classpath, jreClasspath)
         }

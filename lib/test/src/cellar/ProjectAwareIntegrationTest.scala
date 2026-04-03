@@ -3,7 +3,8 @@ package cellar
 import cats.effect.{ExitCode, IO}
 import cats.effect.std.Console
 import munit.CatsEffectSuite
-import java.nio.file.{Files, Path}
+import java.nio.file.Files
+import fs2.io.file.{Files => Fs2Files, Path}
 
 /** Integration tests for project-aware commands.
   *
@@ -23,40 +24,34 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     result.waitFor() == 0
 
   private def isBinaryAvailable(binary: String): Boolean =
-    java.nio.file.Files.isRegularFile(Path.of(binary)) || isOnPath(binary)
+    java.nio.file.Files.isRegularFile(Path(binary).toNioPath) || isOnPath(binary)
 
   private def withTempDir(test: Path => IO[Unit]): IO[Unit] =
-    IO.blocking(Files.createTempDirectory("cellar-test-")).flatMap { dir =>
-      test(dir).guarantee(IO.blocking {
-        val stream = Files.walk(dir)
-        try stream.sorted(java.util.Comparator.reverseOrder()).forEach(Files.deleteIfExists(_))
-        finally stream.close()
-      })
-    }
+    Fs2Files[IO].tempDirectory.use(test)
 
   // --- ProcessRunner tests ---
 
   test("ProcessRunner: echo captures stdout"):
-    process.ProcessRunner.run(List("echo", "hello")).map { result =>
+    process.ProcessRunner.run("echo", List("hello")).map { result =>
       assertEquals(result.exitCode, 0)
       assertEquals(result.stdout.trim, "hello")
       assert(result.stderr.isEmpty)
     }
 
   test("ProcessRunner: non-zero exit captures stderr"):
-    process.ProcessRunner.run(List("sh", "-c", "echo err >&2; exit 1")).map { result =>
+    process.ProcessRunner.run("sh", List("-c", "echo err >&2; exit 1")).map { result =>
       assertEquals(result.exitCode, 1)
       assert(result.stderr.contains("err"))
     }
 
   test("ProcessRunner: command not found"):
-    process.ProcessRunner.run(List("nonexistent-command-xyz")).attempt.map { result =>
+    process.ProcessRunner.run("nonexistent-command-xyz", Nil).attempt.map { result =>
       assert(result.isLeft)
       assert(result.left.exists(_.getMessage.contains("nonexistent-command-xyz")))
     }
 
   test("ProcessRunner: working directory"):
-    process.ProcessRunner.run(List("pwd"), Some(Path.of("/tmp"))).map { result =>
+    process.ProcessRunner.run("pwd", Nil, Some(Path("/tmp"))).map { result =>
       assertEquals(result.exitCode, 0)
       // /tmp may be a symlink to /private/tmp on macOS
       assert(result.stdout.trim.endsWith("/tmp"))
@@ -66,7 +61,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   test("BuildToolDetector: detects Mill from build.mill"):
     withTempDir { dir =>
-      IO.blocking(Files.createFile(dir.resolve("build.mill"))) >>
+      Fs2Files[IO].createFile(dir.resolve("build.mill")) >>
         build.BuildToolDetector.detectKind(dir).map { kind =>
           assertEquals(kind, build.BuildToolKind.Mill)
         }
@@ -74,7 +69,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   test("BuildToolDetector: detects Mill from build.sc"):
     withTempDir { dir =>
-      IO.blocking(Files.createFile(dir.resolve("build.sc"))) >>
+      Fs2Files[IO].createFile(dir.resolve("build.sc")) >>
         build.BuildToolDetector.detectKind(dir).map { kind =>
           assertEquals(kind, build.BuildToolKind.Mill)
         }
@@ -82,7 +77,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   test("BuildToolDetector: detects sbt from build.sbt"):
     withTempDir { dir =>
-      IO.blocking(Files.createFile(dir.resolve("build.sbt"))) >>
+      Fs2Files[IO].createFile(dir.resolve("build.sbt")) >>
         build.BuildToolDetector.detectKind(dir).map { kind =>
           assertEquals(kind, build.BuildToolKind.Sbt)
         }
@@ -90,7 +85,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   test("BuildToolDetector: detects scala-cli from .scala-build"):
     withTempDir { dir =>
-      IO.blocking(Files.createDirectories(dir.resolve(".scala-build"))) >>
+      Fs2Files[IO].createDirectories(dir.resolve(".scala-build")) >>
         build.BuildToolDetector.detectKind(dir).map { kind =>
           assertEquals(kind, build.BuildToolKind.ScalaCli)
         }
@@ -105,44 +100,43 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
 
   test("BuildToolDetector: Mill takes priority over sbt"):
     withTempDir { dir =>
-      IO.blocking {
-        Files.createFile(dir.resolve("build.mill"))
-        Files.createFile(dir.resolve("build.sbt"))
-      } >>
-        build.BuildToolDetector.detectKind(dir).map { kind =>
-          assertEquals(kind, build.BuildToolKind.Mill)
-        }
+      Fs2Files[IO].createFile(dir.resolve("build.mill")) >>
+      Fs2Files[IO].createFile(dir.resolve("build.sbt")) >>
+      build.BuildToolDetector.detectKind(dir).map { kind =>
+        assertEquals(kind, build.BuildToolKind.Mill)
+      }
     }
 
   test("BuildToolDetector: sbt takes priority over scala-cli"):
     withTempDir { dir =>
-      IO.blocking {
-        Files.createFile(dir.resolve("build.sbt"))
-        Files.createDirectories(dir.resolve(".scala-build"))
-      } >>
-        build.BuildToolDetector.detectKind(dir).map { kind =>
-          assertEquals(kind, build.BuildToolKind.Sbt)
-        }
+      Fs2Files[IO].createFile(dir.resolve("build.sbt")) >>
+      Fs2Files[IO].createDirectories(dir.resolve(".scala-build")) >>
+      build.BuildToolDetector.detectKind(dir).map { kind =>
+        assertEquals(kind, build.BuildToolKind.Sbt)
+      }
     }
 
   // --- ClasspathOutputParser tests ---
 
   test("ClasspathOutputParser: JSON array with refs"):
     val input = """["ref:abc123:/path/to/classes", "/path/to/dep.jar"]"""
-    build.ClasspathOutputParser.parseJsonArray(input, checkExists = false) match
+    build.ClasspathOutputParser.parseJsonArray(input, checkExists = false) map {
       case Right(paths) =>
         assertEquals(paths.map(_.toString), List("/path/to/classes", "/path/to/dep.jar"))
       case Left(err) => fail(err)
+    }
 
   test("ClasspathOutputParser: JSON empty array"):
-    build.ClasspathOutputParser.parseJsonArray("[]", checkExists = false) match
+    build.ClasspathOutputParser.parseJsonArray("[]", checkExists = false) map {
       case Left(err) => assert(err.contains("empty"))
       case Right(_)  => fail("Should fail on empty array")
+    }
 
   test("ClasspathOutputParser: JSON malformed"):
-    build.ClasspathOutputParser.parseJsonArray("not json", checkExists = false) match
+    build.ClasspathOutputParser.parseJsonArray("not json", checkExists = false) map {
       case Left(_)  => () // expected
       case Right(_) => fail("Should fail on malformed input")
+    }
 
   test("ClasspathOutputParser: colon-separated"):
     build.ClasspathOutputParser.parseColonSeparated("/a/b.jar:/c/d.jar\n") match
@@ -167,20 +161,20 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
   // --- ScalaCliBuildTool tests ---
 
   test("ScalaCliBuildTool: rejects --module"):
-    build.ScalaCliBuildTool(Path.of(".")).extractClasspath(Some("foo")).attempt.map { result =>
+    build.ScalaCliBuildTool(Path(".")).extractClasspath(Some("foo")).attempt.map { result =>
       assert(result.isLeft)
       assert(result.left.exists(_.getMessage.contains("--module is not supported")))
     }
 
   test("ScalaCliBuildTool: fingerprintFiles returns empty"):
-    build.ScalaCliBuildTool(Path.of(".")).fingerprintFiles().map { files =>
+    build.ScalaCliBuildTool(Path(".")).fingerprintFiles.map { files =>
       assert(files.isEmpty)
     }
 
   // --- MillBuildTool tests ---
 
   test("MillBuildTool: rejects missing --module"):
-    build.MillBuildTool(Path.of(".")).extractClasspath(None).attempt.map { result =>
+    build.MillBuildTool(Path(".")).extractClasspath(None).attempt.map { result =>
       assert(result.isLeft)
       assert(result.left.exists(_.getMessage.contains("--module is required for Mill")))
     }
@@ -188,7 +182,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
   // --- SbtBuildTool tests ---
 
   test("SbtBuildTool: rejects missing --module"):
-    build.SbtBuildTool(Path.of(".")).extractClasspath(None).attempt.map { result =>
+    build.SbtBuildTool(Path(".")).extractClasspath(None).attempt.map { result =>
       assert(result.isLeft)
       assert(result.left.exists(_.getMessage.contains("--module is required for sbt")))
     }
@@ -198,7 +192,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
   test("BuildFingerprint: deterministic"):
     withTempDir { dir =>
       val file = dir.resolve("test.txt")
-      IO.blocking(Files.writeString(file, "hello")) >>
+      IO.blocking(Files.writeString(file.toNioPath, "hello")) >>
         (for
           h1 <- build.BuildFingerprint.compute(List(file), "mod")
           h2 <- build.BuildFingerprint.compute(List(file), "mod")
@@ -209,9 +203,9 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val file = dir.resolve("test.txt")
       for
-        _  <- IO.blocking(Files.writeString(file, "hello"))
+        _  <- IO.blocking(Files.writeString(file.toNioPath, "hello"))
         h1 <- build.BuildFingerprint.compute(List(file), "mod")
-        _  <- IO.blocking(Files.writeString(file, "world"))
+        _  <- IO.blocking(Files.writeString(file.toNioPath, "world"))
         h2 <- build.BuildFingerprint.compute(List(file), "mod")
       yield assertNotEquals(h1, h2)
     }
@@ -220,7 +214,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val file = dir.resolve("test.txt")
       for
-        _  <- IO.blocking(Files.writeString(file, "hello"))
+        _  <- IO.blocking(Files.writeString(file.toNioPath, "hello"))
         h1 <- build.BuildFingerprint.compute(List(file), "modA")
         h2 <- build.BuildFingerprint.compute(List(file), "modB")
       yield assertNotEquals(h1, h2)
@@ -231,7 +225,8 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val a = dir.resolve("a.txt")
       val b = dir.resolve("b.txt")
       for
-        _  <- IO.blocking { Files.writeString(a, "aaa"); Files.writeString(b, "bbb") }
+        _ <- IO.blocking { Files.writeString(a.toNioPath, "aaa") }
+        _ <- IO.blocking { Files.writeString(b.toNioPath, "bbb") }
         h1 <- build.BuildFingerprint.compute(List(a, b), "mod")
         h2 <- build.BuildFingerprint.compute(List(b, a), "mod")
       yield assertEquals(h1, h2)
@@ -241,7 +236,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val existing = dir.resolve("exists.txt")
       val missing = dir.resolve("nope.txt")
-      IO.blocking(Files.writeString(existing, "data")) >>
+      IO.blocking(Files.writeString(existing.toNioPath, "data")) >>
         build.BuildFingerprint.compute(List(existing, missing), "mod").map { hash =>
           assertEquals(hash.length, 64) // valid SHA-256 hex
         }
@@ -261,7 +256,8 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val p1 = dir.resolve("a.jar")
       val p2 = dir.resolve("b.jar")
       for
-        _ <- IO.blocking { Files.createFile(p1); Files.createFile(p2) }
+        _ <- Fs2Files[IO].createFile(p1)
+        _ <- Fs2Files[IO].createFile(p2)
         _ <- cache.put("testhash", List(p1, p2))
         r <- cache.get("testhash")
       yield assertEquals(r, Some(List(p1, p2)))
@@ -279,9 +275,9 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val cache = build.ClasspathCache(dir)
       val p1 = dir.resolve("a.jar")
       for
-        _ <- IO.blocking(Files.createFile(p1))
+        _ <- Fs2Files[IO].createFile(p1)
         _ <- cache.put("hash2", List(p1))
-        _ <- IO.blocking(Files.delete(p1))
+        _ <- Fs2Files[IO].delete(p1)
         r <- cache.get("hash2")
       yield assertEquals(r, None)
     }
@@ -293,7 +289,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Main.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Main.scala").toNioPath,
         """package example
           |
           |class MyClass:
@@ -312,7 +308,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Main.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Main.scala").toNioPath,
         """//> using dep org.typelevel::cats-core:2.10.0
           |
           |package example
@@ -332,7 +328,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Main.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Main.scala").toNioPath,
         """package example
           |
           |class MyClass:
@@ -353,7 +349,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Main.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Main.scala").toNioPath,
         """package example
           |
           |class UniqueTestClassName123:
@@ -371,7 +367,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Main.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Main.scala").toNioPath,
         """package example
           |class Foo
           |""".stripMargin
@@ -387,7 +383,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("Bad.scala"),
+      IO.blocking(Files.writeString(dir.resolve("Bad.scala").toNioPath,
         """package example
           |class Bad {
           |  val x: String = 42  // type error
@@ -408,7 +404,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val console = CapturingConsole()
       given Console[IO] = console
       IO.blocking {
-        Files.writeString(dir.resolve("build.mill"),
+        Files.writeString(dir.resolve("build.mill").toNioPath,
           """package build
             |import mill._, scalalib._
             |
@@ -417,8 +413,8 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
             |}
             |""".stripMargin
         )
-        Files.createDirectories(dir.resolve("app/src"))
-        Files.writeString(dir.resolve("app/src/Main.scala"),
+        Files.createDirectories(dir.resolve("app/src").toNioPath)
+        Files.writeString(dir.resolve("app/src/Main.scala").toNioPath,
           """package example
             |
             |class MillClass:
@@ -438,7 +434,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("build.mill"), "")) >>
+      IO.blocking(Files.writeString(dir.resolve("build.mill").toNioPath, "")) >>
         handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir), millBinary = millBinary).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is required for Mill"), s"Stderr: ${console.errBuf}")
@@ -453,15 +449,15 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val console = CapturingConsole()
       given Console[IO] = console
       IO.blocking {
-        Files.writeString(dir.resolve("build.sbt"),
+        Files.writeString(dir.resolve("build.sbt").toNioPath,
           """lazy val `cellar-test` = (project in file("."))
             |  .settings(scalaVersion := "3.8.1")
             |""".stripMargin
         )
-        Files.createDirectories(dir.resolve("project"))
-        Files.writeString(dir.resolve("project/build.properties"), "sbt.version=1.10.11\n")
-        Files.createDirectories(dir.resolve("src/main/scala/example"))
-        Files.writeString(dir.resolve("src/main/scala/example/Main.scala"),
+        Files.createDirectories(dir.resolve("project").toNioPath)
+        Files.writeString(dir.resolve("project/build.properties").toNioPath, "sbt.version=1.10.11\n")
+        Files.createDirectories(dir.resolve("src/main/scala/example").toNioPath)
+        Files.writeString(dir.resolve("src/main/scala/example/Main.scala").toNioPath,
           """package example
             |
             |class SbtClass:
@@ -480,7 +476,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     withTempDir { dir =>
       val console = CapturingConsole()
       given Console[IO] = console
-      IO.blocking(Files.writeString(dir.resolve("build.sbt"), "")) >>
+      IO.blocking(Files.writeString(dir.resolve("build.sbt").toNioPath, "")) >>
         handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is required for sbt"), s"Stderr: ${console.errBuf}")

@@ -2,7 +2,7 @@ package cellar.build
 
 import cats.effect.{IO, Resource}
 import cellar.ContextResource
-import java.nio.file.Path
+import fs2.io.file.Path
 import tastyquery.Classpaths.Classpath
 import tastyquery.Contexts.Context
 
@@ -32,7 +32,7 @@ object ProjectClasspathProvider:
     val moduleKey = module.getOrElse("")
 
     for
-      fingerFiles <- buildTool.fingerprintFiles()
+      fingerFiles <- buildTool.fingerprintFiles
       hash        <- BuildFingerprint.compute(fingerFiles, moduleKey)
       cached      <- cache.get(hash)
       paths <- cached match
