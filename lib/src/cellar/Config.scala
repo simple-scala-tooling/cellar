@@ -15,7 +15,7 @@ case class SbtConfig(binary: String, extraArgs: String) derives ConfigReader {
 case class Config(mill: MillConfig, sbt: SbtConfig) derives ConfigReader
 
 object Config {
-  val default: IO[Config] = load(None)
+  lazy val default: IO[Config] = load(None)
 
   val defaultUserPath: Option[Path] =
     sys.props.get("user.home").map(Path.of(_).resolve(".cellar").resolve("cellar.conf"))
