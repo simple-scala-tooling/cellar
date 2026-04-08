@@ -5,25 +5,25 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = "0.1.0-M5";
+      version = "v0.1.0-M6";
 
       # Per-platform release artifact metadata
       platforms = {
         x86_64-linux = {
           archive = "cellar-${version}-linux-x86_64.tar.gz";
-          hash = "sha256-3hAe/E0SLSaGJtqquiWU6Flhc/aui2ML/fCDBzj3kLw=";
+          hash = "sha256-Ub9CktQQjVeZx7YVQSK6OFEq1Wt84l667QuWeCaMb3U=";
         };
         aarch64-linux = {
           archive = "cellar-${version}-linux-aarch64.tar.gz";
-          hash = "sha256-OwFeMrOJ/2r3zQOfqMsgvn4fToB1HSP8lWN7s5nDA/Q=";
+          hash = "sha256-XkbeMnVvCIAyaP/mDBooKGb0TvhIDzbNrEtLwgEWtmE=";
         };
         x86_64-darwin = {
           archive = "cellar-${version}-macos-x86_64.tar.gz";
-          hash = "sha256-6+eP5afyemJfkvvvXc+R7Zw5KOSoURwbt/EiAU/P9pg=";
+          hash = "sha256-Jrj0ONEAtmCcsNnEJQ5jEnInZf9EIvXjtGfKmKw153E=";
         };
         aarch64-darwin = {
           archive = "cellar-${version}-macos-arm64.tar.gz";
-          hash = "sha256-lmUgb9IE9r/bwtrZLlkmdJsrev5nwcAfNF6JZune3Qg=";
+          hash = "sha256-BLJUgkWA4jCH+nDaMoVI0YW0cjdn7GixowcyS/rwKDM=";
         };
       };
 
