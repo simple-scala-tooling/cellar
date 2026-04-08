@@ -24,7 +24,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
     result.waitFor() == 0
 
   private def isBinaryAvailable(binary: String): Boolean =
-    java.nio.file.Files.isRegularFile(Path(binary).toNioPath) || isOnPath(binary)
+    Fs2Files[IO].isRegularFile(Path(binary)) || isOnPath(binary)
 
   private def withTempDir(test: Path => IO[Unit]): IO[Unit] =
     Fs2Files[IO].tempDirectory.use(test)
@@ -174,17 +174,19 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
   // --- MillBuildTool tests ---
 
   test("MillBuildTool: rejects missing --module"):
-    build.MillBuildTool(Path(".")).extractClasspath(None).attempt.map { result =>
-      assert(result.isLeft)
-      assert(result.left.exists(_.getMessage.contains("--module is required for Mill")))
+    Config.default.map(config => build.MillBuildTool(Path("."), config.mill))
+      .flatMap(_.extractClasspath(None)).attempt.map { result =>
+        assert(result.isLeft)
+        assert(result.left.exists(_.getMessage.contains("--module is required for Mill")))
     }
 
   // --- SbtBuildTool tests ---
 
   test("SbtBuildTool: rejects missing --module"):
-    build.SbtBuildTool(Path(".")).extractClasspath(None).attempt.map { result =>
-      assert(result.isLeft)
-      assert(result.left.exists(_.getMessage.contains("--module is required for sbt")))
+    Config.default.map(config => build.SbtBuildTool(Path("."), config.sbt)).flatMap(_.extractClasspath(None))
+      .attempt.map { result =>
+        assert(result.isLeft)
+        assert(result.left.exists(_.getMessage.contains("--module is required for sbt")))
     }
 
   // --- BuildFingerprint tests ---
@@ -296,7 +298,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def hello: String = "world"
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.MyClass", module = None, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("example.MyClass", module = None, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}")
           assert(console.outBuf.toString.contains("MyClass"), s"Output: ${console.outBuf}")
           assert(console.outBuf.toString.contains("hello"), s"Output: ${console.outBuf}")
@@ -317,7 +319,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def run: Unit = ()
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("cats.Monad", module = None, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("cats.Monad", module = None, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Success)
           assert(console.outBuf.toString.contains("Monad"), s"Output: ${console.outBuf}")
         }
@@ -336,7 +338,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def goodbye: Int = 42
           |""".stripMargin
       )) >>
-        handlers.ProjectListHandler.run("example.MyClass", module = None, limit = 50, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectListHandler.run("example.MyClass", module = None, limit = 50, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Success)
           val out = console.outBuf.toString
           assert(out.contains("hello"), s"Output: $out")
@@ -356,7 +358,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def run: Unit = ()
           |""".stripMargin
       )) >>
-        handlers.ProjectSearchHandler.run("UniqueTestClassName123", module = None, limit = 50, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectSearchHandler.run("UniqueTestClassName123", module = None, limit = 50, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Success)
           assert(console.outBuf.toString.contains("UniqueTestClassName123"), s"Output: ${console.outBuf}")
         }
@@ -372,7 +374,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |class Foo
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.Foo", module = Some("bar"), cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("example.Foo", module = Some("bar"), _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is not supported"), s"Stderr: ${console.errBuf}")
         }
@@ -390,7 +392,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |}
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.Bad", module = None, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("example.Bad", module = None, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("Compilation failed"), s"Stderr: ${console.errBuf}")
         }
@@ -422,7 +424,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
             |""".stripMargin
         )
       } >>
-        handlers.ProjectGetHandler.run("example.MillClass", module = Some("app"), cwd = Some(dir), millBinary = millBinary).map { code =>
+        Config.default.flatMap(config => handlers.ProjectGetHandler.run("example.MillClass", module = Some("app"), cwd = Some(dir), config = config.copy(mill = MillConfig(millBinary)))).map { code =>
           assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}\nStdout: ${console.outBuf}")
           assert(console.outBuf.toString.contains("MillClass"), s"Output: ${console.outBuf}")
           assert(console.outBuf.toString.contains("greet"), s"Output: ${console.outBuf}")
@@ -435,7 +437,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val console = CapturingConsole()
       given Console[IO] = console
       IO.blocking(Files.writeString(dir.resolve("build.mill").toNioPath, "")) >>
-        handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir), millBinary = millBinary).map { code =>
+        Config.default.flatMap(config => handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir), config = config.copy(mill = MillConfig(millBinary)))).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is required for Mill"), s"Stderr: ${console.errBuf}")
         }
@@ -465,7 +467,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
             |""".stripMargin
         )
       } >>
-        handlers.ProjectGetHandler.run("example.SbtClass", module = Some("cellar-test"), cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("example.SbtClass", module = Some("cellar-test"), _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}")
           assert(console.outBuf.toString.contains("SbtClass"), s"Output: ${console.outBuf}")
         }
@@ -477,7 +479,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val console = CapturingConsole()
       given Console[IO] = console
       IO.blocking(Files.writeString(dir.resolve("build.sbt").toNioPath, "")) >>
-        handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir)).map { code =>
+        Config.default.flatMap(handlers.ProjectGetHandler.run("example.Foo", module = None, _, cwd = Some(dir))).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is required for sbt"), s"Stderr: ${console.errBuf}")
         }

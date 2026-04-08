@@ -2,16 +2,17 @@ package cellar.build
 
 import cats.effect.IO
 import cats.syntax.all._
-import cellar.CellarError
+import cellar.{CellarError, SbtConfig}
 import cellar.process.ProcessRunner
+
 import fs2.io.file.{Files, Path}
 
-class SbtBuildTool(cwd: Path) extends BuildTool:
+class SbtBuildTool(cwd: Path, config: SbtConfig) extends BuildTool:
   def kind: BuildToolKind = BuildToolKind.Sbt
 
   def compile(module: Option[String]): IO[Unit] =
     requireModule(module).flatMap { mod =>
-      ProcessRunner.run("sbt", List("--batch", s"$mod/compile"), Some(cwd)).flatMap { result =>
+      ProcessRunner.run(config.binary, config.effectiveExtraArgs ::: List(s"$mod/compile"), Some(cwd)).flatMap { result =>
         IO.raiseUnless(result.exitCode == 0)(
           CellarError.CompilationFailed(BuildToolKind.Sbt, extractErrors(result.stdout, result.stderr))
         )
@@ -20,7 +21,7 @@ class SbtBuildTool(cwd: Path) extends BuildTool:
 
   def extractClasspath(module: Option[String]): IO[List[Path]] =
     requireModule(module).flatMap { mod =>
-      ProcessRunner.run("sbt", List("--batch", s"export $mod/Compile/fullClasspath"), Some(cwd)).flatMap { result =>
+      ProcessRunner.run(config.binary, config.effectiveExtraArgs ::: List(s"export $mod/Compile/fullClasspath"), Some(cwd)).flatMap { result =>
         if result.exitCode != 0 then
           IO.raiseError(CellarError.CompilationFailed(BuildToolKind.Sbt, extractErrors(result.stdout, result.stderr)))
         else
