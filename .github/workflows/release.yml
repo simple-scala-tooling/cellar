@@ -1,9 +1,11 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.2.3, without v prefix)'
+        required: true
 
 jobs:
   build:
@@ -41,12 +43,12 @@ jobs:
       - name: Build native image
         run: ./mill cli.nativeImage
         env:
-          CELLAR_VERSION: ${{ github.ref_name }}
+          CELLAR_VERSION: v${{ inputs.version }}
 
       - name: Package artifact
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.version }}"
           ARCHIVE="cellar-${VERSION}-${{ matrix.target }}.tar.gz"
           mkdir staging
           cp out/cli/nativeImage.dest/native-executable staging/cellar
@@ -76,11 +78,11 @@ jobs:
       - name: Build assembly JAR
         run: ./mill cli.assembly
         env:
-          CELLAR_VERSION: ${{ github.ref_name }}
+          CELLAR_VERSION: v${{ inputs.version }}
 
       - name: Rename JAR
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.version }}"
           JAR="cellar-${VERSION}.jar"
           cp out/cli/assembly.dest/out.jar "${JAR}"
           echo "JAR=${JAR}" >> "$GITHUB_ENV"
@@ -98,9 +100,12 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      pull-requests: write
 
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+
       - name: Download all artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
@@ -118,32 +123,19 @@ jobs:
         working-directory: artifacts
         run: cosign sign-blob --yes checksums.txt --bundle checksums.txt.bundle
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          files: artifacts/*
-          generate_release_notes: true
-
-      - name: Save checksums before checkout
-        run: cp artifacts/checksums.txt /tmp/checksums.txt
-
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: main
-
       - name: Update flake.nix
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.version }}"
 
           # Convert hex sha256 to Nix SRI format (sha256-<base64>)
           sri_hash() {
             echo -n "$1" | xxd -r -p | base64 | tr -d '\n' | sed 's/^/sha256-/'
           }
 
-          LINUX_X86=$(sri_hash "$(grep "linux-x86_64.tar.gz" /tmp/checksums.txt | awk '{print $1}')")
-          LINUX_ARM=$(sri_hash "$(grep "linux-aarch64.tar.gz" /tmp/checksums.txt | awk '{print $1}')")
-          MACOS_ARM=$(sri_hash "$(grep "macos-arm64.tar.gz" /tmp/checksums.txt | awk '{print $1}')")
-          MACOS_X86=$(sri_hash "$(grep "macos-x86_64.tar.gz" /tmp/checksums.txt | awk '{print $1}')")
+          LINUX_X86=$(sri_hash "$(grep "linux-x86_64.tar.gz" artifacts/checksums.txt | awk '{print $1}')")
+          LINUX_ARM=$(sri_hash "$(grep "linux-aarch64.tar.gz" artifacts/checksums.txt | awk '{print $1}')")
+          MACOS_ARM=$(sri_hash "$(grep "macos-arm64.tar.gz" artifacts/checksums.txt | awk '{print $1}')")
+          MACOS_X86=$(sri_hash "$(grep "macos-x86_64.tar.gz" artifacts/checksums.txt | awk '{print $1}')")
 
           sed -i "0,/version = \".*\";/s|version = \".*\";|version = \"${VERSION}\";|" flake.nix
           sed -i "/linux-x86_64/{n;s|hash = \".*\";|hash = \"${LINUX_X86}\";|}" flake.nix
@@ -151,21 +143,21 @@ jobs:
           sed -i "/macos-x86_64/{n;s|hash = \".*\";|hash = \"${MACOS_X86}\";|}" flake.nix
           sed -i "/macos-arm64/{n;s|hash = \".*\";|hash = \"${MACOS_ARM}\";|}" flake.nix
 
-      - name: Create PR for flake update
+      - name: Commit, tag, and push
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BRANCH="update-flake-${VERSION}"
+          VERSION="${{ inputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add flake.nix
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git checkout -b "${BRANCH}"
+          git diff --cached --quiet && echo "No flake changes" && exit 0
           git commit -m "Update flake.nix to ${VERSION}"
-          git push -u origin "${BRANCH}"
-          gh pr create \
-            --title "Update flake.nix to ${VERSION}" \
-            --body "Automated update of flake.nix hashes for release v${VERSION}." \
-            --base main \
-            --head "${BRANCH}"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          git push origin main
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          tag_name: v${{ inputs.version }}
+          files: artifacts/*
+          generate_release_notes: true
