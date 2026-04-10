@@ -30,10 +30,8 @@ object CoursierFetchClient:
       val dep   = coord.toCoursierDependency.withTransitive(false)
       val fetch = Fetch.create().addDependencies(dep).withCache(Cache.create())
       if extraRepositories.nonEmpty then fetch.addRepositories(extraRepositories*)
-      // Coursier always downloads the POM during resolution; derive its path from the JAR
-      fetch.fetchResult().getArtifacts.asScala
-        .map(_.getValue.toPath)
-        .find(_.getFileName.toString.endsWith(".jar"))
+      // Coursier always downloads the POM alongside the JAR in the cache; derive its path
+      fetch.fetch().asScala.headOption.map(_.toPath)
         .flatMap { jarNio =>
           val pomNio = jarNio.getParent.resolve(jarNio.getFileName.toString.stripSuffix(".jar") + ".pom")
           Option.when(java.nio.file.Files.exists(pomNio))(Path.fromNioPath(pomNio))

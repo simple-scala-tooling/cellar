@@ -26,10 +26,11 @@ object PomParser:
     val doc  = factory.newDocumentBuilder().parse(path.toNioPath.toFile)
     val root = doc.getDocumentElement
 
+    def nodeSeq(nl: org.w3c.dom.NodeList): Seq[org.w3c.dom.Node] =
+      (0 until nl.getLength).map(nl.item)
+
     def text(tag: String): Option[String] =
-      val kids = root.getChildNodes
-      (0 until kids.getLength)
-        .map(kids.item)
+      nodeSeq(root.getChildNodes)
         .collectFirst { case e: Element if e.getTagName == tag => e.getTextContent.trim }
         .filter(_.nonEmpty)
 
@@ -37,10 +38,7 @@ object PomParser:
       val parents = root.getElementsByTagName(parentTag)
       if parents.getLength == 0 then Seq.empty
       else
-        val parent = parents.item(0)
-        val kids   = parent.getChildNodes
-        (0 until kids.getLength)
-          .map(kids.item)
+        nodeSeq(parents.item(0).getChildNodes)
           .collect { case e: Element if e.getTagName == childTag => e }
 
     def elemText(el: Element, tag: String): Option[String] =
