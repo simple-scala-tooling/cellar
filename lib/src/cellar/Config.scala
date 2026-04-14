@@ -18,9 +18,6 @@ object Config {
     sys.props.get("user.home").map(Path(_).resolve(".cellar").resolve("cellar.conf"))
   private val defaultProjectPath: Path = Path(".cellar").resolve("cellar.conf")
 
-  /** Global config loaded from default locations (user-level + project-level).
-    * Cached on first access. Throws on malformed config.
-    */
   lazy val global: Config = {
     val paths = (defaultUserPath.toList ++ List(defaultProjectPath))
       .filter(p => java.nio.file.Files.exists(p.toNioPath))
