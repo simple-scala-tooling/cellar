@@ -299,7 +299,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def hello: String = "world"
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.MyClass", module = None, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("example.MyClass", module = None, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}")
           assert(console.outBuf.toString.contains("MyClass"), s"Output: ${console.outBuf}")
           assert(console.outBuf.toString.contains("hello"), s"Output: ${console.outBuf}")
@@ -320,7 +320,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def run: Unit = ()
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("cats.Monad", module = None, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("cats.Monad", module = None, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Success)
           assert(console.outBuf.toString.contains("Monad"), s"Output: ${console.outBuf}")
         }
@@ -339,7 +339,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def goodbye: Int = 42
           |""".stripMargin
       )) >>
-        handlers.ProjectListHandler.run("example.MyClass", module = None, limit = 50, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectListHandler.run("example.MyClass", module = None, limit = 50, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Success)
           val out = console.outBuf.toString
           assert(out.contains("hello"), s"Output: $out")
@@ -359,7 +359,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |  def run: Unit = ()
           |""".stripMargin
       )) >>
-        handlers.ProjectSearchHandler.run("UniqueTestClassName123", module = None, limit = 50, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectSearchHandler.run("UniqueTestClassName123", module = None, limit = 50, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Success)
           assert(console.outBuf.toString.contains("UniqueTestClassName123"), s"Output: ${console.outBuf}")
         }
@@ -375,7 +375,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |class Foo
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.Foo", module = Some("bar"), Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("example.Foo", module = Some("bar"), cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is not supported"), s"Stderr: ${console.errBuf}")
         }
@@ -393,7 +393,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
           |}
           |""".stripMargin
       )) >>
-        handlers.ProjectGetHandler.run("example.Bad", module = None, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("example.Bad", module = None, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("Compilation failed"), s"Stderr: ${console.errBuf}")
         }
@@ -468,7 +468,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
             |""".stripMargin
         )
       } >>
-        handlers.ProjectGetHandler.run("example.SbtClass", module = Some("cellar-test"), Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("example.SbtClass", module = Some("cellar-test"), cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Success, s"Stderr: ${console.errBuf}")
           assert(console.outBuf.toString.contains("SbtClass"), s"Output: ${console.outBuf}")
         }
@@ -480,7 +480,7 @@ class ProjectAwareIntegrationTest extends CatsEffectSuite:
       val console = CapturingConsole()
       given Console[IO] = console
       IO.blocking(Files.writeString(dir.resolve("build.sbt").toNioPath, "")) >>
-        handlers.ProjectGetHandler.run("example.Foo", module = None, Config.global, cwd = Some(dir)).map { code =>
+        handlers.ProjectGetHandler.run("example.Foo", module = None, cwd = Some(dir)).map { code =>
           assertEquals(code, ExitCode.Error)
           assert(console.errBuf.toString.contains("--module is required for sbt"), s"Stderr: ${console.errBuf}")
         }

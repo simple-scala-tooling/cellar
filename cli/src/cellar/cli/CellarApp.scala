@@ -66,14 +66,14 @@ object CellarApp
   private val getSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get", "Fetch symbol info from the current project") {
       (symbolArg, moduleOpt, javaHomeOpt, noCacheOpt).mapN { (fqn, module, javaHome, noCache) =>
-        ProjectGetHandler.run(fqn, module, Config.global, javaHome, noCache)
+        ProjectGetHandler.run(fqn, module, javaHome, noCache)
       }
     }
 
   private val listSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("list", "List symbols in a package or class from the current project") {
       (symbolArg, moduleOpt, limitOpt, javaHomeOpt, noCacheOpt).mapN { (fqn, module, limit, javaHome, noCache) =>
-        ProjectListHandler.run(fqn, module, limit, Config.global, javaHome, noCache)
+        ProjectListHandler.run(fqn, module, limit, javaHome, noCache)
       }
     }
 
@@ -81,7 +81,7 @@ object CellarApp
     Opts.subcommand("search", "Substring search for symbol names in the current project") {
       (Opts.argument[String]("query"), moduleOpt, limitOpt, javaHomeOpt, noCacheOpt).mapN {
         (query, module, limit, javaHome, noCache) =>
-          ProjectSearchHandler.run(query, module, limit, Config.global, javaHome, noCache)
+          ProjectSearchHandler.run(query, module, limit, javaHome, noCache)
       }
     }
 
