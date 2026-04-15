@@ -38,9 +38,10 @@ object SearchHandler:
     val matchingStream = AllSymbolsStream
       .stream(classpath, jreClasspath)
       .filter(sym => sym.name.toString.toLowerCase.contains(lowerQuery))
-    // Collect all matches, sort shortest name first (closest match), then apply limit
+    // Rank exact-name matches first, then prefix matches, then by length — so
+    // `Monad` beats `Bimonad`/`MonadError` regardless of declaration order.
     matchingStream.compile.toList.flatMap { allMatches =>
-      val sorted  = allMatches.sortBy(_.name.toString.length)
+      val sorted  = allMatches.sortBy(sym => rankKey(lowerQuery, sym.name.toString))
       val limited = sorted.take(limit)
       val note    = if sorted.length > limit then
         Console[IO].errorln(s"Note: results truncated at $limit. Use --limit to increase.")
@@ -53,3 +54,13 @@ object SearchHandler:
         }.flatMap(Console[IO].println)
       } >> note.as(ExitCode.Success)
     }
+
+  /**
+   * Sort key for search results. `lowerQuery` must already be lower-cased.
+   * Order: exact name match → prefix match → shorter name → alphabetical.
+   */
+  private[cellar] def rankKey(lowerQuery: String, name: String): (Int, Int, Int, String) =
+    val lowerName = name.toLowerCase
+    val exact     = if lowerName == lowerQuery then 0 else 1
+    val prefix    = if lowerName.startsWith(lowerQuery) then 0 else 1
+    (exact, prefix, name.length, name)
