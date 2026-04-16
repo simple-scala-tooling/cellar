@@ -14,14 +14,17 @@ object GetHandler:
       coord: MavenCoordinate,
       fqn: String,
       javaHome: Option[Path] = None,
-      extraRepositories: Seq[Repository] = Seq.empty
+      extraRepositories: Seq[Repository] = Seq.empty,
+      limit: Option[Int] = None,
+      hideInherited: Boolean = false,
+      groupInherited: Boolean = false
   )(using Console[IO]): IO[ExitCode] =
     val program =
       for
         jreClasspath <- javaHome.fold(JreClasspath.jrtPath())(JreClasspath.jrtPath)
         result   <- ContextResource.makeFromCoord(coord, jreClasspath, extraRepositories).use { (ctx, classpath) =>
           given Context = ctx
-          runCore(fqn, classpath, Some(coord))
+          runCore(fqn, classpath, Some(coord), limit, hideInherited, groupInherited)
         }
       yield result
 
@@ -32,7 +35,10 @@ object GetHandler:
   def runCore(
       fqn: String,
       classpath: Classpath,
-      coord: Option[MavenCoordinate]
+      coord: Option[MavenCoordinate],
+      limit: Option[Int] = None,
+      hideInherited: Boolean = false,
+      groupInherited: Boolean = false
   )(using Context, Console[IO]): IO[ExitCode] =
     SymbolResolver.resolve(fqn).flatMap {
       case LookupResult.Found(symbols) =>
@@ -40,7 +46,7 @@ object GetHandler:
         for
           _         <- warnShadedDuplicate(fqn, classpath)
           docstring <- coord.fold(IO.pure(Option.empty[String]))(c => IO.blocking(DocstringExtractor.extract(jars.map(_.toNioPath), c, fqn)))
-          formatted <- IO.blocking(GetFormatter.formatGetResult(fqn, symbols, docstring))
+          formatted <- IO.blocking(GetFormatter.formatGetResult(fqn, symbols, docstring, limit, hideInherited, groupInherited))
           _         <- Console[IO].println(formatted)
           _         <- warnScala2(symbols)
         yield ExitCode.Success

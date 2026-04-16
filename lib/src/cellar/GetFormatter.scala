@@ -4,12 +4,18 @@ import tastyquery.Contexts.Context
 import tastyquery.Symbols.{ClassSymbol, Symbol, TermOrTypeSymbol, TermSymbol, TypeSymbol}
 
 object GetFormatter:
-  def formatSymbol(sym: Symbol, docstring: Option[String] = None)(using ctx: Context): String =
+  def formatSymbol(
+      sym: Symbol,
+      docstring: Option[String] = None,
+      limit: Option[Int] = None,
+      hideInherited: Boolean = false,
+      groupInherited: Boolean = false
+  )(using ctx: Context): String =
     val fqn       = sym.displayFullName
     val signature = TypePrinter.printSymbolSignature(sym)
     val flags     = renderFlags(sym)
     val origin    = renderOrigin(sym)
-    val members   = renderMembers(sym)
+    val members   = renderMembers(sym, limit, hideInherited, groupInherited)
     val companion = renderCompanion(sym)
     val subtypes  = renderSubtypes(sym)
 
@@ -26,9 +32,16 @@ object GetFormatter:
     subtypes.foreach(s => sb.append(s"**Known subtypes:** $s\n"))
     sb.toString
 
-  def formatGetResult(@annotation.unused fqn: String, symbols: List[Symbol], docstring: Option[String] = None)(using ctx: Context): String =
+  def formatGetResult(
+      @annotation.unused fqn: String,
+      symbols: List[Symbol],
+      docstring: Option[String] = None,
+      limit: Option[Int] = None,
+      hideInherited: Boolean = false,
+      groupInherited: Boolean = false
+  )(using ctx: Context): String =
     symbols.zipWithIndex.map { (sym, i) =>
-      formatSymbol(sym, if i == 0 then docstring else None)
+      formatSymbol(sym, if i == 0 then docstring else None, limit, hideInherited, groupInherited)
     }.mkString("\n\n---\n\n")
 
   private def cleanDocstring(raw: String): String =
@@ -70,7 +83,12 @@ object GetFormatter:
       case owner: ClassSymbol => owner.displayFullName
       case _                  => sym.displayFullName
 
-  private def renderMembers(sym: Symbol)(using ctx: Context): Option[String] =
+  private def renderMembers(
+      sym: Symbol,
+      limit: Option[Int],
+      hideInherited: Boolean,
+      groupInherited: Boolean
+  )(using ctx: Context): Option[String] =
     sym match
       case cls: ClassSymbol =>
         val members = SymbolResolver.collectClassMembers(cls)

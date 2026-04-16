@@ -52,11 +52,22 @@ object CellarApp
       .option[Int]("limit", "Maximum number of results to return", short = "l", metavar = "N")
       .withDefault(50)
 
+  private val memberLimitOpt: Opts[Option[Int]] =
+    Opts
+      .option[Int]("limit", "Maximum number of members to display", short = "l", metavar = "N")
+      .orNone
+
   private val moduleOpt: Opts[Option[String]] =
     Opts.option[String]("module", "Build module name (required for Mill/sbt)", short = "m", metavar = "name").orNone
 
   private val noCacheOpt: Opts[Boolean] =
     Opts.flag("no-cache", "Skip classpath cache (re-extract from build tool)").orFalse
+
+  private val hideInheritedOpt: Opts[Boolean] =
+    Opts.flag("hide-inherited", "Show only members declared on the type itself").orFalse
+
+  private val groupInheritedOpt: Opts[Boolean] =
+    Opts.flag("group-inherited", "Group members by declaring type with section headers").orFalse
 
   private def parseAndResolve(raw: String, extraRepos: List[Repository]): IO[Either[String, MavenCoordinate]] =
     MavenCoordinate.parse(raw) match
@@ -65,8 +76,9 @@ object CellarApp
 
   private val getSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get", "Fetch symbol info from the current project") {
-      (symbolArg, moduleOpt, javaHomeOpt, noCacheOpt).mapN { (fqn, module, javaHome, noCache) =>
-        ProjectGetHandler.run(fqn, module, javaHome, noCache)
+      (symbolArg, moduleOpt, memberLimitOpt, hideInheritedOpt, groupInheritedOpt, javaHomeOpt, noCacheOpt).mapN {
+        (fqn, module, limit, hideInherited, groupInherited, javaHome, noCache) =>
+          ProjectGetHandler.run(fqn, module, javaHome, noCache, limit, hideInherited, groupInherited)
       }
     }
 
@@ -87,11 +99,12 @@ object CellarApp
 
   private val getExternalSubcmd: Opts[IO[ExitCode]] =
     Opts.subcommand("get-external", "Fetch symbol info from a Maven coordinate") {
-      (coordArg, symbolArg, javaHomeOpt, extraReposOpt).mapN { (rawCoord, fqn, javaHome, extraRepos) =>
-        parseAndResolve(rawCoord, extraRepos).flatMap {
-          case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
-          case Right(coord) => GetHandler.run(coord, fqn, javaHome, extraRepos)
-        }
+      (coordArg, symbolArg, memberLimitOpt, hideInheritedOpt, groupInheritedOpt, javaHomeOpt, extraReposOpt).mapN {
+        (rawCoord, fqn, limit, hideInherited, groupInherited, javaHome, extraRepos) =>
+          parseAndResolve(rawCoord, extraRepos).flatMap {
+            case Left(err)    => IO.blocking(System.err.println(err)).as(ExitCode.Error)
+            case Right(coord) => GetHandler.run(coord, fqn, javaHome, extraRepos, limit, hideInherited, groupInherited)
+          }
       }
     }
 
