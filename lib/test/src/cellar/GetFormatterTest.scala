@@ -182,6 +182,20 @@ class GetFormatterTest extends CatsEffectSuite:
       }
     }
 
+  test("formatSymbol --hide-inherited shows only declared members"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        // CellarLeaf declares leafMethod; midMethod and innerMethod are inherited
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarLeaf")
+        val full   = GetFormatter.formatSymbol(cls)
+        val hidden = GetFormatter.formatSymbol(cls, hideInherited = true)
+        assert(full.contains("midMethod"), s"Expected midMethod in full output: $full")
+        assert(hidden.contains("leafMethod"), s"Expected leafMethod in hidden output: $hidden")
+        assert(!hidden.contains("midMethod"), s"Unexpected midMethod in hidden output: $hidden")
+      }
+    }
+
   test("formatSymbol --limit caps member count and shows note"):
     withCtx { ctx =>
       IO.blocking {

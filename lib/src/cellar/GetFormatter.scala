@@ -91,9 +91,10 @@ object GetFormatter:
   )(using ctx: Context): Option[String] =
     sym match
       case cls: ClassSymbol =>
-        val members = SymbolResolver.collectClassMembers(cls)
-          .filter(PublicApiFilter.isPublic)
-          .map(m => TypePrinter.printSymbolSignatureSafe(m).linesIterator.mkString(" ").trim)
+        val raw =
+          if hideInherited then cls.declarations.filter(PublicApiFilter.isPublic).toList
+          else SymbolResolver.collectClassMembers(cls).filter(PublicApiFilter.isPublic)
+        val members = raw.map(m => TypePrinter.printSymbolSignatureSafe(m).linesIterator.mkString(" ").trim)
         if members.isEmpty then None
         else limit match
           case Some(n) if members.length > n =>
