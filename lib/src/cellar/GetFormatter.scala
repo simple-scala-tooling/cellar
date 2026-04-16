@@ -94,7 +94,12 @@ object GetFormatter:
         val members = SymbolResolver.collectClassMembers(cls)
           .filter(PublicApiFilter.isPublic)
           .map(m => TypePrinter.printSymbolSignatureSafe(m).linesIterator.mkString(" ").trim)
-        if members.isEmpty then None else Some(members.mkString("\n"))
+        if members.isEmpty then None
+        else limit match
+          case Some(n) if members.length > n =>
+            Some(members.take(n).mkString("\n") + s"\n// … ${members.length - n} more members")
+          case _ =>
+            Some(members.mkString("\n"))
       case _ => None
 
   private def renderCompanion(sym: Symbol)(using ctx: Context): Option[String] =

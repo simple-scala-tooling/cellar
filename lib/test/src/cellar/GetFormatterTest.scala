@@ -181,3 +181,19 @@ class GetFormatterTest extends CatsEffectSuite:
         assertEquals(processCount, 3, s"Expected 3 process overloads in:\n$output")
       }
     }
+
+  test("formatSymbol --limit caps member count and shows note"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarOverloaded")
+        val full   = GetFormatter.formatSymbol(cls)
+        val limited = GetFormatter.formatSymbol(cls, limit = Some(2))
+        // Full output has at least 3 process overloads + unique
+        val fullCount = full.linesIterator.count(l => l.contains("def process(") || l.contains("def unique"))
+        assert(fullCount >= 3, s"Expected >= 3 members in full, got $fullCount in:\n$full")
+        // Limited output has exactly 2 member lines in the code block
+        assert(limited.contains("… "), s"Expected truncation note in: $limited")
+        assert(limited.contains("more members"), s"Expected 'more members' in: $limited")
+      }
+    }
