@@ -12,10 +12,13 @@ object ProjectGetHandler:
       module: Option[String],
       javaHome: Option[Path] = None,
       noCache: Boolean = false,
+      limit: Option[Int] = None,
+      hideInherited: Boolean = false,
+      groupInherited: Boolean = false,
       cwd: Option[Path] = None,
       config: Config = Config.global
   )(using Console[IO]): IO[ExitCode] =
     ProjectHandler.run(javaHome, cwd, module, noCache, config) { (ctx, classpath, _) =>
       given Context = ctx
-      GetHandler.runCore(fqn, classpath, coord = None)
+      GetHandler.runCore(fqn, classpath, coord = None, limit, hideInherited, groupInherited)
     }

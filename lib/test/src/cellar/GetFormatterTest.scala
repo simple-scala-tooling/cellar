@@ -181,3 +181,60 @@ class GetFormatterTest extends CatsEffectSuite:
         assertEquals(processCount, 3, s"Expected 3 process overloads in:\n$output")
       }
     }
+
+  test("formatSymbol --hide-inherited shows only declared members"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        // CellarLeaf declares leafMethod; midMethod and innerMethod are inherited
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarLeaf")
+        val full   = GetFormatter.formatSymbol(cls)
+        val hidden = GetFormatter.formatSymbol(cls, hideInherited = true)
+        assert(full.contains("midMethod"), s"Expected midMethod in full output: $full")
+        assert(hidden.contains("leafMethod"), s"Expected leafMethod in hidden output: $hidden")
+        assert(!hidden.contains("midMethod"), s"Unexpected midMethod in hidden output: $hidden")
+      }
+    }
+
+  test("formatSymbol --group-inherited adds section headers by declaring class"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        // CellarLeaf → CellarMid → CellarOuter
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarLeaf")
+        val output = GetFormatter.formatSymbol(cls, groupInherited = true)
+        assert(output.contains("// Declared on CellarLeaf"), s"Expected declared section in:\n$output")
+        assert(output.contains("// Inherited from CellarMid"), s"Expected CellarMid section in:\n$output")
+        assert(output.contains("// Inherited from CellarOuter"), s"Expected CellarOuter section in:\n$output")
+        assert(output.contains("leafMethod"), s"Expected leafMethod in:\n$output")
+        assert(output.contains("midMethod"), s"Expected midMethod in:\n$output")
+      }
+    }
+
+  test("formatSymbol --hide-inherited wins over --group-inherited"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarLeaf")
+        val output = GetFormatter.formatSymbol(cls, hideInherited = true, groupInherited = true)
+        assert(output.contains("leafMethod"), s"Expected leafMethod in:\n$output")
+        assert(!output.contains("midMethod"), s"Unexpected midMethod in:\n$output")
+        assert(!output.contains("Inherited from"), s"Unexpected section header in:\n$output")
+      }
+    }
+
+  test("formatSymbol --limit caps member count and shows note"):
+    withCtx { ctx =>
+      IO.blocking {
+        given Context = ctx
+        val cls    = ctx.findStaticClass("cellar.fixture.scala3.CellarOverloaded")
+        val full   = GetFormatter.formatSymbol(cls)
+        val limited = GetFormatter.formatSymbol(cls, limit = Some(2))
+        // Full output has at least 3 process overloads + unique
+        val fullCount = full.linesIterator.count(l => l.contains("def process(") || l.contains("def unique"))
+        assert(fullCount >= 3, s"Expected >= 3 members in full, got $fullCount in:\n$full")
+        // Limited output has exactly 2 member lines in the code block
+        assert(limited.contains("… "), s"Expected truncation note in: $limited")
+        assert(limited.contains("more members"), s"Expected 'more members' in: $limited")
+      }
+    }
