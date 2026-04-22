@@ -42,7 +42,8 @@ object SourceFetcher:
         case Some(e) =>
           val allLines = scala.io.Source.fromInputStream(zip.getInputStream(e), "UTF-8")
             .getLines().toIndexedSeq
-          val extracted = allLines.slice(startLine, endLine + 1)
+          val extracted = if endLine == Int.MaxValue then allLines.drop(startLine)
+                         else allLines.slice(startLine, endLine + 1)
           Right(SourceResult(e.getName, startLine, endLine, extracted))
     finally
       zip.close()
