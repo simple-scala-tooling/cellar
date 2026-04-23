@@ -218,7 +218,7 @@ class IntegrationTest extends CatsEffectSuite:
         )
       }
 
-  test("get-source: Java class returns java code block"):
+  test("get-source: Java class returns java code block with source body"):
     TestFixtures.assumeFixturesAvailable()
     val console = CapturingConsole()
     given Console[IO] = console
@@ -230,7 +230,9 @@ class IntegrationTest extends CatsEffectSuite:
       )
       .map { code =>
         assertEquals(code, ExitCode.Success)
-        assert(console.outBuf.toString.contains("```java"), s"Output: ${console.outBuf}")
+        val out = console.outBuf.toString
+        assert(out.contains("```java"), s"Output: $out")
+        assert(out.contains("getDefault"), s"Expected source body in: $out")
       }
 
   test("get-source: trait with same-file companion returns both"):
