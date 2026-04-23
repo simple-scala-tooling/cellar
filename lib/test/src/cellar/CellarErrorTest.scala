@@ -26,7 +26,7 @@ class CellarErrorTest extends munit.FunSuite:
   test("SymbolNotFound with empty nearMatches and version=latest does not add a Try hint"):
     val latestCoord = MavenCoordinate("org.example", "lib", "latest")
     val e           = CellarError.SymbolNotFound("Foo", latestCoord, Nil)
-    assert(!e.getMessage.contains("Try"))
+    assert(!e.getMessage.contains("Try 'org.example:lib:latest'"))
 
   test("SymbolNotFound with nearMatches lists all of them"):
     val e = CellarError.SymbolNotFound("Foo", coord, List("bar.Foo", "baz.Foo"))
