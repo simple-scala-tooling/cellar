@@ -232,7 +232,7 @@ class IntegrationTest extends CatsEffectSuite:
         assertEquals(code, ExitCode.Success)
         val out = console.outBuf.toString
         assert(out.contains("```java"), s"Output: $out")
-        assert(out.contains("CellarJavaClass"), s"Expected source body in: $out")
+        assert(out.contains("getDefault"), s"Expected source body in: $out")
       }
 
   test("get-source: trait with same-file companion returns both"):
