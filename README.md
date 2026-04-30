@@ -260,7 +260,7 @@ Install cellar as a Claude Code plugin for auto-updates:
 
 ```sh
 /plugin marketplace add virtuslab/cellar
-/plugin install cellar@cellar
+/plugin install cellar@virtuslab-cellar
 ```
 
 Claude will automatically have access to the `/cellar:cellar` skill and know when to use it.
