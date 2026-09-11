@@ -108,7 +108,7 @@ object profilingRuntime extends CellarPublishModule {
   def mvnDeps = Seq(
     mvn"org.typelevel::otel4s-sdk-trace:0.19.2",
     mvn"org.typelevel::otel4s-sdk-exporter:0.19.2",
-    mvn"io.pyroscope:agent:2.9.1"
+    mvn"io.pyroscope:agent:2.9.2"
   )
 
   object test extends ScalaTests with TestModule.Munit {
